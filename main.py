@@ -205,7 +205,8 @@ def get_progress_stats():
     images = get_image_files()
     total = len(images)
     all_annotations = annotations()
-    annotated_count = len(set(a.image_path for a in all_annotations if a.rating > 0))
+    # Consider any existing annotation record as annotated, including rating=0
+    annotated_count = len(set(a.image_path for a in all_annotations))
     marked_count = len([a for a in all_annotations if getattr(a, 'marked', False)])
     
     return {
@@ -217,12 +218,16 @@ def get_progress_stats():
     }
 
 def get_annotation_for_image(image_path):
-    """Get annotation data for a specific image."""
+    """Get annotation data for a specific image, including existence flag."""
     # Use parameterized query - image_path should be the relative path string
     result = annotations("image_path=?", (str(image_path),), limit=1)
     if result:
-        return {'rating': result[0].rating, 'marked': getattr(result[0], 'marked', False)}
-    return {'rating': 0, 'marked': False}
+        return {
+            'rating': result[0].rating,
+            'marked': getattr(result[0], 'marked', False),
+            'exists': True
+        }
+    return {'rating': 0, 'marked': False, 'exists': False}
 
 def index_of_image(image_name: str) -> int:
     """Return index of an image (relative path str) in the image list, or -1."""
@@ -255,13 +260,14 @@ def _filtered_items(q: str = '', rating: str = '', show: str = 'all', marked: st
         ann = amap.get(sp, {'rating': 0, 'marked': False})
         r = ann['rating']
         m = ann['marked']
+        has_ann = (sp in amap)
         if q and q.lower() not in sp.lower():
             continue
         if rating_val is not None and r != rating_val:
             continue
-        if show == 'annotated' and r <= 0:
+        if show == 'annotated' and not has_ann:
             continue
-        if show == 'unannotated' and r > 0:
+        if show == 'unannotated' and has_ann:
             continue
         if marked_only and not m:
             continue
@@ -423,6 +429,7 @@ def index():
     annotation_data = get_annotation_for_image(current_image)
     current_rating = annotation_data['rating']
     is_marked = annotation_data['marked']
+    has_annotation = annotation_data.get('exists', False)
     stats = get_progress_stats()
     
     return Titled(config.title,
@@ -493,8 +500,8 @@ def index():
                         Label("Filter by rating:", style="margin-right: 10px; font-weight: 500;"),
                         Select(
                             Option("All ratings", value="", selected=state.filter_rating is None),
-                            *[Option(f"Rating {i}", value=str(i), selected=state.filter_rating == i) 
-                              for i in range(1, config.num_classes + 1)],
+                            *[Option(f"Rating {i}", value=str(i), selected=state.filter_rating == i)
+                              for i in range(0, config.num_classes)],
                             name="rating_filter_select",
                             hx_post="/filter_rating",
                             hx_target="body",
@@ -525,7 +532,7 @@ def index():
             Div(
                 Div(
                     f"Current Rating: ",
-                    Span(current_rating if current_rating > 0 else 'Not rated'),
+                    Span(current_rating if has_annotation else 'Not rated'),
                     cls="current-rating"
                 ),
                 
@@ -534,11 +541,11 @@ def index():
                     Div(
                         *[Button(
                             str(i),
-                            cls=f"rating-btn {'active' if current_rating == i else ''}",
+                            cls=f"rating-btn {'active' if (current_rating == i and has_annotation) else ''}",
                             hx_post=f"/rate/{i}",
                             hx_target="body",
                             hx_swap="outerHTML"
-                        ) for i in range(1, config.num_classes + 1)],
+                        ) for i in range(0, config.num_classes)],
                         cls="rating-buttons"
                     ),
                     Div(
@@ -596,7 +603,7 @@ def index():
                 # Help text
                 Div(
                     "Keyboard shortcuts: ",
-                    Span(f"1-{config.num_classes}", cls="kbd"), " rate & next | ",
+                    Span(f"0-{max(0, config.num_classes - 1)}", cls="kbd"), " rate & next | ",
                     Span("←→", cls="kbd"), " navigate | ",
                     Span("U", cls="kbd"), " undo | ",
                     Span("D", cls="kbd"), " delete | ",
@@ -613,8 +620,17 @@ def index():
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
                 
                 // Number keys for rating (with navigation)
-                if (e.key >= '1' && e.key <= '{config.num_classes}') {{
+                if (e.key >= '1' && e.key <= '{config.num_classes - 1}') {{
                     htmx.ajax('POST', '/rate_and_next/' + e.key, {{
+                        target: 'body',
+                        swap: 'outerHTML'
+                    }});
+                    e.preventDefault();
+                    return;
+                }}
+                // Allow rating 0 via keyboard
+                if (e.key === '0') {{
+                    htmx.ajax('POST', '/rate_and_next/0', {{
                         target: 'body',
                         swap: 'outerHTML'
                     }});
@@ -637,10 +653,10 @@ def index():
                     case 'd': case 'D':
                         targetBtn = document.querySelector('button[hx-post="/delete"]');
                         break;
-                    case 'x': case 'X':
-                        targetBtn = document.querySelector('#mark-checkbox');
-                        break;
-                }}
+            case 'x': case 'X':
+                targetBtn = document.querySelector('#mark-checkbox');
+                break;
+            }}
                 
                 if (targetBtn && !targetBtn.disabled) {{
                     htmx.trigger(targetBtn, 'click');
@@ -663,7 +679,7 @@ def browse(q: str = '', rating: str = '', show: str = 'all', marked: str = '', s
                   hx_get="/browse_grid", hx_target="#browse-grid", hx_trigger="keyup changed delay:300ms", hx_swap="outerHTML", cls="filter-input"),
             Select(
                 Option("All ratings", value="", selected=(not rating)),
-                *[Option(f"Rating {i}", value=str(i), selected=(rating == str(i))) for i in range(1, config.num_classes + 1)],
+                *[Option(f"Rating {i}", value=str(i), selected=(rating == str(i))) for i in range(0, config.num_classes)],
                 name="rating", hx_get="/browse_grid", hx_target="#browse-grid", hx_trigger="change", hx_swap="outerHTML", cls="filter-select"
             ),
             Select(
@@ -698,7 +714,7 @@ def browse(q: str = '', rating: str = '', show: str = 'all', marked: str = '', s
         Div(
             Select(
                 Option("Set rating…", value=""),
-                *[Option(f"{i}", value=str(i)) for i in range(1, config.num_classes + 1)],
+                *[Option(f"{i}", value=str(i)) for i in range(0, config.num_classes)],
                 name="set_rating", cls="filter-select"
             ),
             Button("Apply", cls="page-btn",
@@ -789,7 +805,7 @@ def batch_rate(set_rating: str = '', q: str = '', rating: str = '', show: str = 
     print(f"DEBUG batch_rate: set_rating='{set_rating}', selected_count={len(state.selected)}")
     if set_rating and set_rating.isdigit():
         val = int(set_rating)
-        if 1 <= val <= config.num_classes:
+        if 0 <= val < config.num_classes:
             print(f"DEBUG: Applying rating {val} to {len(state.selected)} images")
             for spath in list(state.selected):
                 print(f"DEBUG: Processing {spath}")
@@ -807,7 +823,7 @@ def batch_rate(set_rating: str = '', q: str = '', rating: str = '', show: str = 
                     })
                     print(f"DEBUG: Created new annotation for {spath}")
         else:
-            print(f"DEBUG: Rating {val} out of range (1-{config.num_classes})")
+            print(f"DEBUG: Rating {val} out of range (0-{config.num_classes - 1})")
     else:
         print(f"DEBUG: Invalid set_rating value: '{set_rating}'")
     return browse(q=q, rating=rating, show=show, marked=marked, sort=sort, page=page)
@@ -895,7 +911,8 @@ def get_image(image_name: str):
 @rt("/rate/{rating:int}", methods=["POST"])
 def rate(rating: int):
     """Save annotation (button click - stay on image)."""
-    if rating < 1 or rating > config.num_classes:
+    # Accept 0..num_classes-1 as valid ratings
+    if rating < 0 or rating >= config.num_classes:
         return index()
     
     current_image = get_current_image()
@@ -903,9 +920,11 @@ def rate(rating: int):
         # Store in history for undo
         old_annotation_data = get_annotation_for_image(str(current_image))
         old_annotation = old_annotation_data['rating']
+        had_annotation = old_annotation_data.get('exists', False)
         state.history.append({
             'image_name': str(current_image),
             'old_rating': old_annotation,
+            'had_annotation': had_annotation,
             'index': state.current_index,
             'action': 'rate'
         })
@@ -939,7 +958,8 @@ def rate(rating: int):
 @rt("/rate_and_next/{rating:int}", methods=["POST"])
 def rate_and_next(rating: int):
     """Save annotation and move to next image (keyboard shortcut)."""
-    if rating < 1 or rating > config.num_classes:
+    # Accept 0..num_classes-1 as valid ratings
+    if rating < 0 or rating >= config.num_classes:
         return index()
     
     current_image = get_current_image()
@@ -947,9 +967,11 @@ def rate_and_next(rating: int):
         # Store in history for undo
         old_annotation_data = get_annotation_for_image(str(current_image))
         old_annotation = old_annotation_data['rating']
+        had_annotation = old_annotation_data.get('exists', False)
         state.history.append({
             'image_name': str(current_image),
             'old_rating': old_annotation,
+            'had_annotation': had_annotation,
             'index': state.current_index,
             'action': 'rate'
         })
@@ -1004,6 +1026,7 @@ def undo():
             image_name = last_action['image_name']
             image_data = last_action.get('image_data')
             old_rating = last_action['old_rating']
+            had_annotation = last_action.get('had_annotation', old_rating is not None)
             
             if image_data:
                 # Restore the image file
@@ -1015,8 +1038,8 @@ def undo():
                         f.write(image_data)
                     print(f"Restored image file: {image_path}")
                     
-                    # Restore annotation if there was one
-                    if old_rating > 0:
+                    # Restore annotation if there was one previously (even if rating was 0)
+                    if had_annotation:
                         annotations.insert({
                             'image_path': image_name,
                             'rating': old_rating,
@@ -1035,14 +1058,15 @@ def undo():
             # Handle rating undo (existing logic)
             image_name = last_action['image_name']
             old_rating = last_action['old_rating']
+            had_annotation = last_action.get('had_annotation', old_rating is not None)
             
-            if old_rating == 0:
-                # Delete annotation
+            if not had_annotation:
+                # If there was no prior annotation, undo should remove the record created by the rating
                 existing = annotations("image_path=?", (image_name,), limit=1)
                 if existing:
                     annotations.delete(existing[0].id)
             else:
-                # Restore old rating
+                # Restore previous rating (can be 0..N-1)
                 existing = annotations("image_path=?", (image_name,), limit=1)
                 if existing:
                     annotations.update({'rating': old_rating}, existing[0].id)
@@ -1144,6 +1168,7 @@ def delete():
         image_data = None
         old_annotation_data = get_annotation_for_image(str(current_image))
         old_annotation = old_annotation_data['rating']
+        had_annotation = old_annotation_data.get('exists', False)
         
         if image_path.exists():
             try:
@@ -1163,7 +1188,8 @@ def delete():
             'old_rating': old_annotation,
             'index': state.current_index,
             'action': 'delete',
-            'image_data': image_data
+            'image_data': image_data,
+            'had_annotation': had_annotation
         })
         
         # Keep history limited
