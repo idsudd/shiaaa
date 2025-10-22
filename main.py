@@ -57,14 +57,18 @@ state = AppState()
 
 # Helper functions
 def get_audio_files():
-    """Get all audio files from the configured directory."""
+    """Get all audio files from the configured directory (deduplicated)."""
     audio_dir = Path(config.audio_folder)
-    audio_files = []
+    audio_files_set = set()
     if audio_dir.exists():
         for ext in ['.webm', '.mp3', '.wav', '.ogg', '.m4a', '.flac']:
-            audio_files.extend(audio_dir.rglob(f"*{ext}"))
-            audio_files.extend(audio_dir.rglob(f"*{ext.upper()}"))
-    return sorted([audio.relative_to(audio_dir) for audio in audio_files])
+            # Search case-insensitively but only add each file once
+            for audio_file in audio_dir.rglob(f"*{ext}"):
+                audio_files_set.add(audio_file)
+            for audio_file in audio_dir.rglob(f"*{ext.upper()}"):
+                audio_files_set.add(audio_file)
+    # Return sorted list of relative paths
+    return sorted([audio.relative_to(audio_dir) for audio in audio_files_set])
 
 def get_username():
     """Get current username."""
@@ -104,7 +108,9 @@ def get_current_clip():
 
     # If no clips exist, create the first one
     if not audio_clips:
-        return auto_generate_clip(state.current_audio, 0)
+        new_clip = auto_generate_clip(state.current_audio, 0)
+        state.current_clip_index = 0
+        return new_clip
 
     # Ensure current_clip_index is valid
     if state.current_clip_index >= len(audio_clips):
@@ -148,6 +154,200 @@ def get_progress_stats():
         'marked_clips': marked_clips
     }
 
+def render_main_content():
+    """Render the main content area (for HTMX swapping)."""
+    audio_files = get_audio_files()
+    current_clip = get_current_clip()
+    stats = get_progress_stats()
+
+    return Div(
+        # Audio file selector
+        Div(
+            Label("Audio File:", style="margin-right: 10px; font-weight: 600;"),
+            Select(
+                *[Option(str(audio), value=str(audio), selected=(str(audio) == state.current_audio))
+                  for audio in audio_files],
+                name="audio_select",
+                hx_post="/select_audio",
+                hx_target="#main-content",
+                hx_swap="outerHTML",
+                hx_trigger="change",
+                style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 2px solid #007bff; background: white; font-size: 14px;"
+            ),
+            style="display: flex; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;"
+        ),
+
+        # Progress section
+        Div(
+            Div(
+                f"Audio {stats['current_audio_index']} of {stats['total_audio']} | ",
+                f"Clip {stats['current_clip_num']} of {stats['total_clips']} | ",
+                f"Marked: {stats['marked_clips']}",
+                cls="progress"
+            ),
+        ),
+
+        # Current audio filename
+        Div(f"File: {state.current_audio}", cls="progress", style="font-weight: 500; margin-bottom: 15px;"),
+
+        # Waveform container
+        Div(
+            id="waveform",
+            style="width: 100%; height: 128px; margin-bottom: 15px; background: #f0f0f0; border-radius: 4px;"
+        ),
+
+        # Timeline container
+        Div(
+            id="timeline",
+            style="width: 100%; margin-bottom: 20px;"
+        ),
+
+        # Playback controls
+        Div(
+            Button("▶ Play Clip", id="play-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
+            Button("⏸ Pause", id="pause-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
+            Button("⏹ Stop", id="stop-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
+            Label("Speed:", style="margin-left: 20px; font-weight: 500;"),
+            Select(
+                Option("0.5x", value="0.5"),
+                Option("0.75x", value="0.75"),
+                Option("1x", value="1", selected=True),
+                Option("1.25x", value="1.25"),
+                Option("1.5x", value="1.5"),
+                Option("2x", value="2"),
+                id="speed-select",
+                style="padding: 8px; margin-left: 5px;"
+            ),
+            style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 8px;"
+        ),
+
+        # Current clip editor
+        Div(
+            H3(f"Clip {stats['current_clip_num']}", style="margin-bottom: 15px; color: #007bff;"),
+
+            # Timestamp controls
+            Div(
+                Div(
+                    Label("Start (seconds):", style="display: block; margin-bottom: 5px; font-weight: 500;"),
+                    Input(
+                        type="number",
+                        name="start_time",
+                        value=f"{current_clip.start_timestamp:.2f}" if current_clip else "0.00",
+                        step="0.01",
+                        min="0",
+                        id="start-time-input",
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                    ),
+                    style="flex: 1;"
+                ),
+                Div(
+                    Label("End (seconds):", style="display: block; margin-bottom: 5px; font-weight: 500;"),
+                    Input(
+                        type="number",
+                        name="end_time",
+                        value=f"{current_clip.end_timestamp:.2f}" if current_clip else "10.00",
+                        step="0.01",
+                        min="0",
+                        id="end-time-input",
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+                    ),
+                    style="flex: 1;"
+                ),
+                Button(
+                    "Update Times",
+                    hx_post="/update_times",
+                    hx_include="#start-time-input, #end-time-input",
+                    hx_target="#main-content",
+                    hx_swap="outerHTML",
+                    cls="update-btn",
+                    style="align-self: flex-end; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;"
+                ),
+                style="display: flex; gap: 15px; margin-bottom: 20px;"
+            ),
+
+            # Transcription text area
+            Div(
+                Label("Transcription:", style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 16px;"),
+                Textarea(
+                    current_clip.text if current_clip and current_clip.text else "",
+                    name="transcription",
+                    id="transcription-input",
+                    rows="6",
+                    placeholder="Enter transcription for this clip...",
+                    style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"
+                ),
+                style="margin-bottom: 15px;"
+            ),
+
+            # Mark as problematic
+            Div(
+                Label(
+                    Input(
+                        type="checkbox",
+                        name="marked",
+                        id="marked-input",
+                        checked=current_clip.marked if current_clip else False
+                    ),
+                    " Mark as problematic",
+                    style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;"
+                ),
+                style="margin-bottom: 20px;"
+            ),
+
+            # Save button
+            Button(
+                "💾 Save Clip",
+                hx_post="/save_current_clip",
+                hx_include="#transcription-input, #marked-input",
+                hx_target="#main-content",
+                hx_swap="outerHTML",
+                cls="save-btn",
+                style="width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600;"
+            ),
+
+            style="padding: 20px; background: #f9f9f9; border: 2px solid #007bff; border-radius: 8px; margin-bottom: 20px;"
+        ),
+
+        # Navigation controls
+        Div(
+            Button(
+                "← Previous Clip",
+                cls="nav-btn",
+                hx_post="/prev_clip",
+                hx_target="#main-content",
+                hx_swap="outerHTML",
+                style="flex: 1;"
+            ),
+            Button(
+                "Delete Clip",
+                hx_post="/delete_current_clip",
+                hx_target="#main-content",
+                hx_swap="outerHTML",
+                hx_confirm="Delete this clip?",
+                cls="delete-btn",
+                style="background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;"
+            ),
+            Button(
+                "Next Clip →",
+                cls="nav-btn",
+                hx_post="/next_clip",
+                hx_target="#main-content",
+                hx_swap="outerHTML",
+                style="flex: 1;"
+            ),
+            cls="nav-controls",
+            style="display: flex; gap: 10px; justify-content: center;"
+        ),
+
+        id="main-content",
+        # Add data attributes for WaveSurfer initialization
+        **{
+            'data-audio-path': str(state.current_audio),
+            'data-clip-start': str(current_clip.start_timestamp if current_clip else 0),
+            'data-clip-end': str(current_clip.end_timestamp if current_clip else 10),
+        }
+    )
+
 @rt("/")
 def index():
     """Main audio annotation interface."""
@@ -170,201 +370,34 @@ def index():
         state.current_audio = str(audio_files[0])
         state.current_clip_index = 0
 
-    current_clip = get_current_clip()
-    stats = get_progress_stats()
-
     return Titled(config.title,
         Div(
-            # Audio file selector
-            Div(
-                Label("Audio File:", style="margin-right: 10px; font-weight: 600;"),
-                Select(
-                    *[Option(str(audio), value=str(audio), selected=(str(audio) == state.current_audio))
-                      for audio in audio_files],
-                    name="audio_select",
-                    hx_post="/select_audio",
-                    hx_target="body",
-                    hx_swap="outerHTML",
-                    hx_trigger="change",
-                    style="flex: 1; padding: 8px 12px; border-radius: 6px; border: 2px solid #007bff; background: white; font-size: 14px;"
-                ),
-                style="display: flex; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;"
-            ),
-
-            # Progress section
-            Div(
-                Div(
-                    f"Audio {stats['current_audio_index']} of {stats['total_audio']} | ",
-                    f"Clip {stats['current_clip_num']} of {stats['total_clips']} | ",
-                    f"Marked: {stats['marked_clips']}",
-                    cls="progress"
-                ),
-            ),
-
-            # Current audio filename
-            Div(f"File: {state.current_audio}", cls="progress", style="font-weight: 500; margin-bottom: 15px;"),
-
-            # Waveform container
-            Div(
-                id="waveform",
-                style="width: 100%; height: 128px; margin-bottom: 15px; background: #f0f0f0; border-radius: 4px;"
-            ),
-
-            # Timeline container
-            Div(
-                id="timeline",
-                style="width: 100%; margin-bottom: 20px;"
-            ),
-
-            # Playback controls
-            Div(
-                Button("▶ Play Clip", id="play-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
-                Button("⏸ Pause", id="pause-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
-                Button("⏹ Stop", id="stop-btn", cls="control-btn", style="padding: 12px 24px; font-size: 16px;"),
-                Label("Speed:", style="margin-left: 20px; font-weight: 500;"),
-                Select(
-                    Option("0.5x", value="0.5"),
-                    Option("0.75x", value="0.75"),
-                    Option("1x", value="1", selected=True),
-                    Option("1.25x", value="1.25"),
-                    Option("1.5x", value="1.5"),
-                    Option("2x", value="2"),
-                    id="speed-select",
-                    style="padding: 8px; margin-left: 5px;"
-                ),
-                style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 8px;"
-            ),
-
-            # Current clip editor
-            Div(
-                H3(f"Clip {stats['current_clip_num']}", style="margin-bottom: 15px; color: #007bff;"),
-
-                # Timestamp controls
-                Div(
-                    Div(
-                        Label("Start (seconds):", style="display: block; margin-bottom: 5px; font-weight: 500;"),
-                        Input(
-                            type="number",
-                            name="start_time",
-                            value=f"{current_clip.start_timestamp:.2f}" if current_clip else "0.00",
-                            step="0.01",
-                            min="0",
-                            id="start-time-input",
-                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
-                        ),
-                        style="flex: 1;"
-                    ),
-                    Div(
-                        Label("End (seconds):", style="display: block; margin-bottom: 5px; font-weight: 500;"),
-                        Input(
-                            type="number",
-                            name="end_time",
-                            value=f"{current_clip.end_timestamp:.2f}" if current_clip else "10.00",
-                            step="0.01",
-                            min="0",
-                            id="end-time-input",
-                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
-                        ),
-                        style="flex: 1;"
-                    ),
-                    Button(
-                        "Update Times",
-                        hx_post="/update_times",
-                        hx_include="#start-time-input, #end-time-input",
-                        hx_target="body",
-                        hx_swap="outerHTML",
-                        cls="update-btn",
-                        style="align-self: flex-end; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;"
-                    ),
-                    style="display: flex; gap: 15px; margin-bottom: 20px;"
-                ),
-
-                # Transcription text area
-                Div(
-                    Label("Transcription:", style="display: block; margin-bottom: 8px; font-weight: 500; font-size: 16px;"),
-                    Textarea(
-                        current_clip.text if current_clip and current_clip.text else "",
-                        name="transcription",
-                        id="transcription-input",
-                        rows="6",
-                        placeholder="Enter transcription for this clip...",
-                        style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"
-                    ),
-                    style="margin-bottom: 15px;"
-                ),
-
-                # Mark as problematic
-                Div(
-                    Label(
-                        Input(
-                            type="checkbox",
-                            name="marked",
-                            id="marked-input",
-                            checked=current_clip.marked if current_clip else False
-                        ),
-                        " Mark as problematic",
-                        style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;"
-                    ),
-                    style="margin-bottom: 20px;"
-                ),
-
-                # Save button
-                Button(
-                    "💾 Save Clip",
-                    hx_post="/save_current_clip",
-                    hx_include="#transcription-input, #marked-input",
-                    hx_target="body",
-                    hx_swap="outerHTML",
-                    cls="save-btn",
-                    style="width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600;"
-                ),
-
-                style="padding: 20px; background: #f9f9f9; border: 2px solid #007bff; border-radius: 8px; margin-bottom: 20px;"
-            ),
-
-            # Navigation controls
-            Div(
-                Button(
-                    "← Previous Clip",
-                    cls="nav-btn",
-                    hx_post="/prev_clip",
-                    hx_target="body",
-                    hx_swap="outerHTML",
-                    style="flex: 1;"
-                ),
-                Button(
-                    "Delete Clip",
-                    hx_post="/delete_current_clip",
-                    hx_target="body",
-                    hx_swap="outerHTML",
-                    hx_confirm="Delete this clip?",
-                    cls="delete-btn",
-                    style="background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;"
-                ),
-                Button(
-                    "Next Clip →",
-                    cls="nav-btn",
-                    hx_post="/next_clip",
-                    hx_target="body",
-                    hx_swap="outerHTML",
-                    style="flex: 1;"
-                ),
-                cls="nav-controls",
-                style="display: flex; gap: 10px; justify-content: center;"
-            ),
-
+            render_main_content(),
             cls="container"
         ),
 
         # WaveSurfer.js initialization script
-        Script(f"""
-            let wavesurfer;
-            let wsRegions;
+        Script("""
+            let wavesurfer = null;
+            let wsRegions = null;
             let currentRegion = null;
 
-            document.addEventListener('DOMContentLoaded', function() {{
+            function initWaveSurfer() {
+                // Destroy existing instance if any
+                if (wavesurfer) {
+                    wavesurfer.destroy();
+                }
+
+                // Get data from main-content element
+                const mainContent = document.getElementById('main-content');
+                if (!mainContent) return;
+
+                const audioPath = mainContent.dataset.audioPath;
+                const clipStart = parseFloat(mainContent.dataset.clipStart);
+                const clipEnd = parseFloat(mainContent.dataset.clipEnd);
+
                 // Initialize WaveSurfer
-                wavesurfer = WaveSurfer.create({{
+                wavesurfer = WaveSurfer.create({
                     container: '#waveform',
                     waveColor: '#4F4A85',
                     progressColor: '#383351',
@@ -373,95 +406,111 @@ def index():
                     barGap: 1,
                     barRadius: 2,
                     responsive: true,
-                }});
+                });
 
                 // Add regions plugin
                 wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
 
                 // Add timeline plugin
-                wavesurfer.registerPlugin(WaveSurfer.Timeline.create({{
+                wavesurfer.registerPlugin(WaveSurfer.Timeline.create({
                     container: '#timeline',
-                }}));
+                }));
 
                 // Load audio file
-                wavesurfer.load('/{config.audio_folder}/{state.current_audio}');
+                wavesurfer.load('""" + f"/{config.audio_folder}/" + """' + audioPath);
 
-                // Load current clip as region
-                const clipData = {{
-                    start: {current_clip.start_timestamp if current_clip else 0},
-                    end: {current_clip.end_timestamp if current_clip else 10}
-                }};
-
-                wavesurfer.on('ready', () => {{
+                wavesurfer.on('ready', () => {
                     // Clear any existing regions
                     wsRegions.clearRegions();
 
                     // Add current clip region
-                    currentRegion = wsRegions.addRegion({{
-                        start: clipData.start,
-                        end: clipData.end,
+                    currentRegion = wsRegions.addRegion({
+                        start: clipStart,
+                        end: clipEnd,
                         color: 'rgba(0, 123, 255, 0.3)',
                         drag: true,
                         resize: true,
-                    }});
+                    });
 
                     // Update input fields when region is dragged/resized
-                    currentRegion.on('update', () => {{
-                        document.getElementById('start-time-input').value = currentRegion.start.toFixed(2);
-                        document.getElementById('end-time-input').value = currentRegion.end.toFixed(2);
-                    }});
-                }});
+                    currentRegion.on('update', () => {
+                        const startInput = document.getElementById('start-time-input');
+                        const endInput = document.getElementById('end-time-input');
+                        if (startInput) startInput.value = currentRegion.start.toFixed(2);
+                        if (endInput) endInput.value = currentRegion.end.toFixed(2);
+                    });
+                });
 
                 // Update region when input fields change
-                document.getElementById('start-time-input').addEventListener('input', (e) => {{
-                    if (currentRegion) {{
-                        const start = parseFloat(e.target.value) || 0;
-                        const end = currentRegion.end;
-                        currentRegion.setOptions({{ start, end }});
-                    }}
-                }});
+                const startInput = document.getElementById('start-time-input');
+                const endInput = document.getElementById('end-time-input');
 
-                document.getElementById('end-time-input').addEventListener('input', (e) => {{
-                    if (currentRegion) {{
-                        const start = currentRegion.start;
-                        const end = parseFloat(e.target.value) || 10;
-                        currentRegion.setOptions({{ start, end }});
-                    }}
-                }});
+                if (startInput) {
+                    startInput.addEventListener('input', (e) => {
+                        if (currentRegion) {
+                            const start = parseFloat(e.target.value) || 0;
+                            const end = currentRegion.end;
+                            currentRegion.setOptions({ start, end });
+                        }
+                    });
+                }
+
+                if (endInput) {
+                    endInput.addEventListener('input', (e) => {
+                        if (currentRegion) {
+                            const start = currentRegion.start;
+                            const end = parseFloat(e.target.value) || 10;
+                            currentRegion.setOptions({ start, end });
+                        }
+                    });
+                }
 
                 // Playback controls - play only current clip
-                document.getElementById('play-btn').addEventListener('click', () => {{
-                    if (currentRegion) {{
-                        currentRegion.play();
-                    }}
-                }});
+                const playBtn = document.getElementById('play-btn');
+                const pauseBtn = document.getElementById('pause-btn');
+                const stopBtn = document.getElementById('stop-btn');
+                const speedSelect = document.getElementById('speed-select');
 
-                document.getElementById('pause-btn').addEventListener('click', () => {{
-                    wavesurfer.pause();
-                }});
+                if (playBtn) {
+                    playBtn.addEventListener('click', () => {
+                        if (currentRegion) {
+                            currentRegion.play();
+                        }
+                    });
+                }
 
-                document.getElementById('stop-btn').addEventListener('click', () => {{
-                    wavesurfer.stop();
-                }});
+                if (pauseBtn) {
+                    pauseBtn.addEventListener('click', () => {
+                        wavesurfer.pause();
+                    });
+                }
 
-                document.getElementById('speed-select').addEventListener('change', (e) => {{
-                    wavesurfer.setPlaybackRate(parseFloat(e.target.value));
-                }});
+                if (stopBtn) {
+                    stopBtn.addEventListener('click', () => {
+                        wavesurfer.stop();
+                    });
+                }
+
+                if (speedSelect) {
+                    speedSelect.addEventListener('change', (e) => {
+                        wavesurfer.setPlaybackRate(parseFloat(e.target.value));
+                    });
+                }
 
                 // Keyboard shortcuts
-                document.addEventListener('keydown', (e) => {{
+                document.addEventListener('keydown', (e) => {
                     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-                    switch(e.key) {{
+                    switch(e.key) {
                         case ' ':
                             e.preventDefault();
-                            if (currentRegion) {{
-                                if (wavesurfer.isPlaying()) {{
+                            if (currentRegion) {
+                                if (wavesurfer.isPlaying()) {
                                     wavesurfer.pause();
-                                }} else {{
+                                } else {
                                     currentRegion.play();
-                                }}
-                            }}
+                                }
+                            }
                             break;
                         case 'ArrowLeft':
                             e.preventDefault();
@@ -471,9 +520,19 @@ def index():
                             e.preventDefault();
                             wavesurfer.skip(2);
                             break;
-                    }}
-                }});
-            }});
+                    }
+                });
+            }
+
+            // Initialize on page load
+            document.addEventListener('DOMContentLoaded', initWaveSurfer);
+
+            // Re-initialize after HTMX swap
+            document.body.addEventListener('htmx:afterSwap', function(event) {
+                if (event.detail.target.id === 'main-content') {
+                    initWaveSurfer();
+                }
+            });
         """)
     )
 
@@ -483,7 +542,7 @@ def select_audio(audio_select: str = ''):
     if audio_select:
         state.current_audio = audio_select
         state.current_clip_index = 0
-    return index()
+    return render_main_content()
 
 @rt("/save_current_clip", methods=["POST"])
 def save_current_clip(transcription: str = "", marked: str = ""):
@@ -495,7 +554,7 @@ def save_current_clip(transcription: str = "", marked: str = ""):
             'marked': marked == "on",
             'timestamp': datetime.now().isoformat()
         }, current_clip.id)
-    return index()
+    return render_main_content()
 
 @rt("/update_times", methods=["POST"])
 def update_times(start_time: str = "0", end_time: str = "10"):
@@ -513,17 +572,14 @@ def update_times(start_time: str = "0", end_time: str = "10"):
                 }, current_clip.id)
         except ValueError:
             pass
-    return index()
+    return render_main_content()
 
 @rt("/prev_clip", methods=["POST"])
 def prev_clip():
     """Navigate to previous clip, or stay at first clip."""
-    audio_clips = get_clips_for_audio(state.current_audio)
-
     if state.current_clip_index > 0:
         state.current_clip_index -= 1
-
-    return index()
+    return render_main_content()
 
 @rt("/next_clip", methods=["POST"])
 def next_clip():
@@ -535,12 +591,11 @@ def next_clip():
         last_clip = audio_clips[-1] if audio_clips else None
         last_end = last_clip.end_timestamp if last_clip else 0
         auto_generate_clip(state.current_audio, last_end)
-        audio_clips = get_clips_for_audio(state.current_audio)
 
     # Move to next clip
     state.current_clip_index += 1
 
-    return index()
+    return render_main_content()
 
 @rt("/delete_current_clip", methods=["POST"])
 def delete_current_clip():
@@ -552,7 +607,7 @@ def delete_current_clip():
         audio_clips = get_clips_for_audio(state.current_audio)
         if state.current_clip_index >= len(audio_clips) and state.current_clip_index > 0:
             state.current_clip_index -= 1
-    return index()
+    return render_main_content()
 
 @rt("/styles.css")
 def get_styles():
