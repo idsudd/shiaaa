@@ -11,7 +11,7 @@ import json
 @dataclass
 class Config:
     audio_folder: str = sp.field(positional=True, help="The folder containing the audio files and annotations.db")
-    title: str = "Audio Transcription Tool"
+    title: str = "Audio Annotation Tool"
     description: str = "Annotate audio clips with transcriptions"
     max_history: int = 10
 
