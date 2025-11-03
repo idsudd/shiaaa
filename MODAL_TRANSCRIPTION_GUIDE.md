@@ -29,7 +29,44 @@ export HF_TOKEN=your_token_here
 
 ## Basic Usage
 
-### 1. Transcribe an audio directory
+### Quick Test (Single File)
+
+Test Modal transcription with a single audio file:
+
+```bash
+# Auto-detect first audio file in ./audio folder
+modal run modal_run.py::test_transcription
+
+# Specify a specific file
+modal run modal_run.py::test_transcription --audio-file ./audio/example.webm
+
+# With word timestamps
+modal run modal_run.py::test_transcription --word-timestamps
+
+# Different model
+modal run modal_run.py::test_transcription --model openai/whisper-large-v3-turbo
+```
+
+### Transcribe Single File (Save Results)
+
+```bash
+# Transcribe and save to JSON
+modal run modal_run.py::transcribe_file --audio-file ./audio/example.webm
+
+# Save to specific output path
+modal run modal_run.py::transcribe_file \
+  --audio-file ./audio/example.webm \
+  --output results/transcription.json
+
+# With word timestamps
+modal run modal_run.py::transcribe_file \
+  --audio-file ./audio/example.webm \
+  --word-timestamps
+```
+
+### Batch Processing (Multiple Files)
+
+For processing entire directories with database storage:
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -44,36 +81,27 @@ This will:
 - Save JSON results to `./audio/transcriptions/`
 - Store segments in SQLite database (`./audio/annotations.db`)
 
-### 2. With word timestamps
+### Additional Options
 
-To get word-level timestamps:
-
+**With word timestamps:**
 ```bash
-python scripts/preprocess_audio.py \
-  --audio-folder ./audio \
-  --model openai/whisper-large-v3 \
-  --language es \
+modal run modal_run.py::transcribe_file \
+  --audio-file ./audio/example.webm \
   --word-timestamps
 ```
 
-### 3. Without VAD segmentation
-
-To transcribe each file as a single block (no VAD):
-
+**Without VAD segmentation:**
 ```bash
-python scripts/preprocess_audio.py \
-  --audio-folder ./audio \
-  --model openai/whisper-large-v3 \
-  --language es \
+modal run modal_run.py::transcribe_file \
+  --audio-file ./audio/example.webm \
   --no-vad
 ```
 
-### 4. Overwrite existing transcriptions
-
+**Auto-detect language:**
 ```bash
-python scripts/preprocess_audio.py \
-  --audio-folder ./audio \
-  --overwrite
+modal run modal_run.py::transcribe_file \
+  --audio-file ./audio/example.webm \
+  --language auto
 ```
 
 ## Configuration Options

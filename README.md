@@ -138,17 +138,6 @@ The tool includes **cloud-based Whisper transcription** using [Modal](https://mo
 - ✅ **Generates word-level timestamps** (optional)
 - ✅ **Saves segments to database** with precise start/end times
 
-```bash
-# Basic usage (uses Modal by default)
-python scripts/preprocess_audio.py --audio-folder ./audio --language es
-
-# With word-level timestamps
-python scripts/preprocess_audio.py --audio-folder ./audio --word-timestamps
-
-# Without VAD segmentation
-python scripts/preprocess_audio.py --audio-folder ./audio --no-vad
-```
-
 **First-time setup:**
 ```bash
 # Install Modal
@@ -156,6 +145,30 @@ pip install modal
 
 # Authenticate with Modal
 modal setup
+```
+
+**Quick test with single file:**
+```bash
+# Test transcription (auto-detects first audio file)
+modal run modal_run.py::test_transcription
+
+# Or specify a file
+modal run modal_run.py::test_transcription --audio-file ./audio/example.webm
+```
+
+**Transcribe single file:**
+```bash
+# Transcribe and save to JSON
+modal run modal_run.py::transcribe_file --audio-file ./audio/example.webm --output results.json
+```
+
+**Batch processing (multiple files):**
+```bash
+# Process entire directory with database storage
+python scripts/preprocess_audio.py --audio-folder ./audio --language es
+
+# With word-level timestamps
+python scripts/preprocess_audio.py --audio-folder ./audio --word-timestamps
 ```
 
 By default, transcripts are written to `<audio_folder>/transcriptions/` as JSON files, and segments are stored in the database. See **[MODAL_TRANSCRIPTION_GUIDE.md](MODAL_TRANSCRIPTION_GUIDE.md)** for detailed documentation, configuration options, and troubleshooting.

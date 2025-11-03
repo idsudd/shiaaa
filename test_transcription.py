@@ -1,6 +1,26 @@
 #!/usr/bin/env python3
 """
-Test script to verify Modal transcription works correctly.
+DEPRECATED: Use modal_run.py instead
+
+This script is deprecated. Modal code should be run using:
+    modal run modal_run.py::test_transcription
+
+See MODAL_TRANSCRIPTION_GUIDE.md for usage instructions.
+"""
+import sys
+
+print("="*80)
+print("DEPRECATED SCRIPT")
+print("="*80)
+print("\nThis script is deprecated. Use Modal's proper entrypoint instead:")
+print("\n  modal run modal_run.py::test_transcription")
+print("\nFor more options:")
+print("  modal run modal_run.py::test_transcription --help")
+print("\nSee MODAL_TRANSCRIPTION_GUIDE.md for complete documentation.")
+print("="*80)
+sys.exit(1)
+
+# Legacy code below (kept for reference)
 """
 from pathlib import Path
 import sys
