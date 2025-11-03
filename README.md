@@ -151,11 +151,13 @@ Everything runs in Modal - no local dependencies except Modal CLI:
 pip install modal
 modal setup
 
+cd modal_app
+
 # 1. Upload audio files to Modal Volume
-modal run modal_app/run.py::stage_data --audio-folder ./audio
+modal run.py::stage_data --audio-folder ./audio
 
 # 2. Batch transcribe all files (parallel processing)
-modal run modal_app/run.py::batch_transcription --language es --word-timestamps
+modal run.py::batch_transcription --language es --word-timestamps
 
 # 3. Download results
 modal volume get transcription-results ./results/

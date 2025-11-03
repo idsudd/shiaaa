@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 
 from app.common import app
-from app.stage_data import list_audio_files, upload_audio_files
+from app.stage_data import list_audio_files, upload_single_file
 from app.transcription import batch_transcribe, transcribe_audio_file
 
 
@@ -30,8 +30,31 @@ def stage_data(*args):
         print(f"Error: Audio folder does not exist: {audio_folder}")
         return
 
-    print(f"Uploading audio files from: {audio_folder}")
-    uploaded_files = upload_audio_files.remote(str(audio_folder))
+    # Find all audio files locally
+    audio_extensions = {".webm", ".mp3", ".wav", ".ogg", ".m4a", ".flac"}
+    audio_files = []
+    for ext in audio_extensions:
+        audio_files.extend(audio_folder.rglob(f"*{ext}"))
+
+    if not audio_files:
+        print(f"No audio files found in {audio_folder}")
+        return
+
+    print(f"Found {len(audio_files)} audio files to upload from: {audio_folder}")
+
+    # Upload files to Modal Volume
+    uploaded_files = []
+    for local_path in audio_files:
+        rel_path = local_path.relative_to(audio_folder)
+        print(f"Uploading: {rel_path}")
+        
+        # Read file content locally
+        with open(local_path, 'rb') as f:
+            file_content = f.read()
+        
+        # Upload to Modal Volume
+        upload_single_file.remote(str(rel_path), file_content)
+        uploaded_files.append(str(rel_path))
 
     print(f"\nSuccessfully uploaded {len(uploaded_files)} files:")
     for file_path in uploaded_files:

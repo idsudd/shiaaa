@@ -296,17 +296,88 @@ class WhisperModel:
         if not audio_segments:
             return []
 
+        print(f"Received {len(audio_segments)} segments for transcription")
+        print(f"First segment type: {type(audio_segments[0])}")
+        
+        # Convert all segments to numpy arrays if needed
+        # Must maintain same length as input for Modal batching
+        processed_segments = []
+        for i, seg in enumerate(audio_segments):
+            try:
+                if isinstance(seg, list):
+                    # Convert list to numpy array
+                    seg = np.array(seg, dtype=np.float32)
+                elif not isinstance(seg, np.ndarray):
+                    # Convert other types to numpy array
+                    seg = np.array(seg, dtype=np.float32)
+                
+                # Ensure 1D
+                if len(seg.shape) > 1:
+                    seg = seg.flatten()
+                    
+                processed_segments.append(seg)
+            except Exception as e:
+                print(f"Error processing segment {i}: {e}")
+                print(f"Segment type: {type(seg)}")
+                print(f"Segment content: {seg[:10] if hasattr(seg, '__len__') and len(seg) > 10 else seg}")
+                # Add empty segment to maintain length consistency
+                processed_segments.append(np.array([], dtype=np.float32))
+
+        # Check if we have any valid segments
+        if not processed_segments:
+            print("No valid segments found after processing")
+            return []
+
+        print(f"Successfully processed {len(processed_segments)} segments")
+
+        # Process segments individually but in batch using pipeline
         kwargs: Dict[str, object] = {
-            "sampling_rate": ASR_SAMPLE_RATE,
-            "batch_size": min(len(audio_segments), self.batch_size),
+            "batch_size": min(len(processed_segments), self.batch_size),
             "return_timestamps": "word" if self.return_word_timestamps else False,
             "generate_kwargs": self.generate_kwargs,
         }
 
-        result = self.pipeline(audio_segments, **kwargs)
-        if isinstance(result, dict):
-            return [result]
-        return list(result)
+        # Convert list of arrays to format expected by pipeline
+        # Pipeline expects each audio as separate input
+        results = []
+        batch_size = max(1, kwargs["batch_size"])  # Ensure batch_size is at least 1
+        
+        for i in range(0, len(processed_segments), batch_size):
+            batch = processed_segments[i:i + batch_size]
+            
+            # Process each segment in the batch
+            batch_results = []
+            for audio_array in batch:
+                try:
+                    # Skip empty segments but still add a result
+                    if len(audio_array) == 0:
+                        batch_results.append({"text": "", "chunks": []})
+                        continue
+                    
+                    # Process single audio segment
+                    result = self.pipeline(
+                        audio_array,
+                        return_timestamps="word" if self.return_word_timestamps else False,
+                        generate_kwargs=self.generate_kwargs,
+                    )
+                    batch_results.append(result)
+                except Exception as e:
+                    print(f"Error transcribing segment: {e}")
+                    # Add empty result to maintain batch consistency
+                    batch_results.append({"text": "", "chunks": []})
+            
+            results.extend(batch_results)
+
+        # Ensure we return exactly the same number of results as inputs
+        if len(results) != len(audio_segments):
+            print(f"WARNING: Result count mismatch! Input: {len(audio_segments)}, Output: {len(results)}")
+            # Pad with empty results if needed
+            while len(results) < len(audio_segments):
+                results.append({"text": "", "chunks": []})
+            # Truncate if too many results
+            results = results[:len(audio_segments)]
+
+        return results
 
 
 @app.function(
@@ -346,8 +417,33 @@ def transcribe_audio_file(
         raise ValueError(f"Audio file not found in Modal Volume: {audio_path}")
 
     print(f"Loading audio: {audio_path}")
-    waveform, sample_rate = sf.read(str(full_path), always_2d=False)
-    waveform = np.asarray(waveform, dtype=np.float32)
+    
+    # Try loading with soundfile first, fallback to ffmpeg for unsupported formats
+    try:
+        waveform, sample_rate = sf.read(str(full_path), always_2d=False)
+        waveform = np.asarray(waveform, dtype=np.float32)
+    except sf.LibsndfileError:
+        # Fallback to ffmpeg for formats not supported by soundfile (like WebM)
+        print(f"soundfile failed, using ffmpeg for: {audio_path}")
+        import subprocess
+        
+        # Use ffmpeg to convert to WAV in memory
+        cmd = [
+            "ffmpeg", "-i", str(full_path), 
+            "-f", "wav", "-acodec", "pcm_s16le", 
+            "-ar", "16000", "-ac", "1", "-"
+        ]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, check=True)
+            # Load the WAV data from ffmpeg output
+            import io
+            waveform, sample_rate = sf.read(io.BytesIO(result.stdout), always_2d=False)
+            waveform = np.asarray(waveform, dtype=np.float32)
+        except subprocess.CalledProcessError as e:
+            raise ValueError(f"Could not load audio file {audio_path}: {e}")
+        except Exception as e:
+            raise ValueError(f"Error processing audio file {audio_path}: {e}")
 
     # Segment audio with VAD or process as single segment
     if use_vad:
@@ -376,22 +472,33 @@ def transcribe_audio_file(
     detected_language: Optional[str] = None
 
     for (_, start_t, end_t), out in zip(segments, batch_out):
-        text = str(out.get("text", "")).strip()
-        words: Optional[List[WordTranscription]] = None
+        # Handle different output formats from the pipeline
+        if isinstance(out, str):
+            # Pipeline returned just the text
+            text = out.strip()
+            words = None
+        elif isinstance(out, dict):
+            # Pipeline returned a dictionary with metadata
+            text = str(out.get("text", "")).strip()
+            words: Optional[List[WordTranscription]] = None
 
-        if return_word_timestamps and "chunks" in out:
-            words = []
-            for chunk in out.get("chunks", []):
-                timestamp = chunk.get("timestamp") or (None, None)
-                start, end = timestamp
-                if start is not None:
-                    start = float(start) + start_t
-                if end is not None:
-                    end = float(end) + start_t
-                words.append(WordTranscription(start=start, end=end, text=str(chunk.get("text", ""))))
+            if return_word_timestamps and "chunks" in out:
+                words = []
+                for chunk in out.get("chunks", []):
+                    timestamp = chunk.get("timestamp") or (None, None)
+                    start, end = timestamp
+                    if start is not None:
+                        start = float(start) + start_t
+                    if end is not None:
+                        end = float(end) + start_t
+                    words.append(WordTranscription(start=start, end=end, text=str(chunk.get("text", ""))))
 
-        if detected_language is None:
-            detected_language = str(out.get("language")) if out.get("language") else None
+            if detected_language is None:
+                detected_language = str(out.get("language")) if out.get("language") else None
+        else:
+            # Unknown format, try to convert to string
+            text = str(out).strip()
+            words = None
 
         collected_segments.append(SegmentTranscription(start=float(start_t), end=float(end_t), text=text, words=words))
 
@@ -448,7 +555,12 @@ def batch_transcribe(
     # Process files in parallel using .map()
     transcription_results = list(
         transcribe_audio_file.map(
-            [(f, model_name, language, return_word_timestamps, use_vad, vad_config) for f in audio_files]
+            audio_files,
+            [model_name] * len(audio_files),
+            [language] * len(audio_files),
+            [return_word_timestamps] * len(audio_files),
+            [use_vad] * len(audio_files),
+            [vad_config] * len(audio_files),
         )
     )
 
