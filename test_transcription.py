@@ -49,11 +49,18 @@ def test_transcription():
         print("   Create an 'audio' directory and add .wav or .mp3 files to test")
         return
 
-    # Find first audio file
-    audio_files = list(audio_dir.glob("**/*.wav")) + list(audio_dir.glob("**/*.mp3"))
+    # Find first audio file (supports multiple formats)
+    audio_files = (
+        list(audio_dir.glob("**/*.wav"))
+        + list(audio_dir.glob("**/*.mp3"))
+        + list(audio_dir.glob("**/*.webm"))
+        + list(audio_dir.glob("**/*.ogg"))
+        + list(audio_dir.glob("**/*.m4a"))
+        + list(audio_dir.glob("**/*.flac"))
+    )
     if not audio_files:
         print(f"\n❌ Error: No audio files found in {audio_dir}")
-        print("   Add .wav or .mp3 files to the 'audio' directory")
+        print("   Add audio files (.wav, .mp3, .webm, .ogg, .m4a, .flac) to the 'audio' directory")
         return
 
     test_file = audio_files[0]
