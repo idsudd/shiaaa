@@ -8,6 +8,11 @@ import sys
 import json
 from datetime import datetime
 
+try:
+    import modal
+except ImportError:  # pragma: no cover - optional dependency
+    modal = None
+
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file if present
 
@@ -50,6 +55,8 @@ app, rt = fast_app(
     pico=False,
     debug=True
 )
+
+fasthtml_serve = serve
 
 
 # Helper functions
@@ -741,6 +748,37 @@ def get_audio(audio_name: str):
     return Response("Audio not found", status_code=404)
 
 
+def get_asgi_app():
+    """Return the FastHTML ASGI app instance for external servers."""
+
+    return app
+
+
+if modal is not None:
+    modal_app = modal.App("fast-audio-annotate")
+
+    requirements_file = ROOT_DIR / "requirements.txt"
+    image_builder = modal.Image.debian_slim(python_version="3.12")
+    if requirements_file.exists():
+        if hasattr(image_builder, "pip_install_from_requirements"):
+            modal_image = image_builder.pip_install_from_requirements(str(requirements_file))
+        else:  # Fallback for older modal clients
+            with requirements_file.open("r", encoding="utf-8") as handle:
+                packages = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
+            for package in packages:
+                image_builder = image_builder.pip_install(package)
+            modal_image = image_builder
+    else:
+        modal_image = image_builder.pip_install("python-fasthtml==0.12.33")
+
+    @modal_app.function(image=modal_image)
+    @modal.asgi_app()
+    def serve():
+        """Expose the FastHTML app as an ASGI application on Modal."""
+
+        return get_asgi_app()
+
+
 # Print startup info
 if __name__ == "__main__":
     print(f"Starting {config.title}")
@@ -756,7 +794,7 @@ if __name__ == "__main__":
     print(f"  - Total clips: {total_clips}")
 
     try:
-        serve(host="localhost", port=5001)
+        fasthtml_serve(host="localhost", port=5001)
     except KeyboardInterrupt:
         print("\nShutting down...")
         print("Goodbye!")
