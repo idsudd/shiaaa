@@ -77,9 +77,9 @@ app = modal.App(
 class WhisperModel:
     """Remote Whisper inference that mirrors the local :class:`WhisperTranscriber`."""
 
-    # Use modal.parameter() instead of custom __init__
+    # Modal parameters - Optional types not supported, so omit type hint for nullable params
     model_name: str = modal.parameter()
-    language: Optional[str] = modal.parameter(default=None)
+    language = modal.parameter(default=None)  # str or None
     return_word_timestamps: bool = modal.parameter(default=False)
     batch_size: int = modal.parameter(default=8)
 
