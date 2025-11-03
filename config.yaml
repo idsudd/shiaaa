@@ -4,4 +4,4 @@ audio_folder: "audio"
 max_history: 10
 metadata_filename: "metadata.json"
 whisper_model: "openai/whisper-large-v3"
-transcription_language:
+transcription_language: "es"
