@@ -45,7 +45,13 @@ image = (
             "HF_HOME": MODEL_DIR,
         }
     )
-    .apt_install("ffmpeg", "libsndfile1")
+    # Install build tools for webrtcvad compilation
+    .apt_install(
+        "ffmpeg",
+        "libsndfile1",
+        "build-essential",
+        "clang",
+    )
     .pip_install(
         "torch==2.7.1",
         "transformers==4.48.1",
