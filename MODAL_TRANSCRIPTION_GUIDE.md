@@ -1,35 +1,35 @@
-# Guía de Transcripción con Modal
+# Modal Transcription Guide
 
-Este proyecto usa Modal para ejecutar transcripciones de Whisper en la nube con segmentación automática usando VAD (Voice Activity Detection).
+This project uses Modal to run Whisper transcriptions in the cloud with automatic segmentation using VAD (Voice Activity Detection).
 
-## Características
+## Features
 
-- ✅ **Transcripción en Modal**: Usa GPUs L40S en la nube (configurable)
-- ✅ **Segmentación VAD**: Divide automáticamente el audio en segmentos con timestamps
-- ✅ **Word Timestamps**: Opcionalmente obtiene timestamps a nivel de palabra
-- ✅ **Batching Automático**: Procesa múltiples segmentos en paralelo
-- ✅ **Caché de Modelos**: Los modelos se cachean en Modal Volume para cargas rápidas
+- ✅ **Modal Transcription**: Uses cloud L40S GPUs (configurable)
+- ✅ **VAD Segmentation**: Automatically splits audio into segments with timestamps
+- ✅ **Word Timestamps**: Optionally captures word-level timestamps
+- ✅ **Automatic Batching**: Processes multiple segments in parallel
+- ✅ **Model Caching**: Models are cached in Modal Volume for fast loading
 
-## Instalación
+## Installation
 
-1. Instala las dependencias:
+1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Configura Modal:
+2. Set up Modal:
 ```bash
 modal setup
 ```
 
-3. (Opcional) Configura tu token de Hugging Face si usas modelos privados:
+3. (Optional) Configure your Hugging Face token if using private models:
 ```bash
-export HF_TOKEN=tu_token_aqui
+export HF_TOKEN=your_token_here
 ```
 
-## Uso Básico
+## Basic Usage
 
-### 1. Transcribir un directorio de audio
+### 1. Transcribe an audio directory
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -39,14 +39,14 @@ python scripts/preprocess_audio.py \
   --batch-size 8
 ```
 
-Esto:
-- Transcribe todos los archivos de audio en `./audio`
-- Guarda los resultados JSON en `./audio/transcriptions/`
-- Almacena los segmentos en la base de datos SQLite (`./audio/annotations.db`)
+This will:
+- Transcribe all audio files in `./audio`
+- Save JSON results to `./audio/transcriptions/`
+- Store segments in SQLite database (`./audio/annotations.db`)
 
-### 2. Con word timestamps
+### 2. With word timestamps
 
-Para obtener timestamps a nivel de palabra:
+To get word-level timestamps:
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -56,9 +56,9 @@ python scripts/preprocess_audio.py \
   --word-timestamps
 ```
 
-### 3. Sin segmentación VAD
+### 3. Without VAD segmentation
 
-Para transcribir cada archivo como un solo bloque (sin VAD):
+To transcribe each file as a single block (no VAD):
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -68,7 +68,7 @@ python scripts/preprocess_audio.py \
   --no-vad
 ```
 
-### 4. Sobrescribir transcripciones existentes
+### 4. Overwrite existing transcriptions
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -76,28 +76,28 @@ python scripts/preprocess_audio.py \
   --overwrite
 ```
 
-## Opciones de Configuración
+## Configuration Options
 
-### Argumentos de línea de comandos
+### Command-line Arguments
 
-- `--config`: Ruta al archivo de configuración YAML (default: `./config.yaml`)
-- `--audio-folder`: Carpeta con archivos de audio
-- `--output`: Directorio para guardar JSONs de transcripción (default: `{audio-folder}/transcriptions`)
-- `--model`: Modelo de Whisper a usar (default: del config.yaml)
-- `--language`: Idioma de transcripción (ej: `es`, `en`, `auto`)
-- `--batch-size`: Tamaño de batch para inferencia (default: 8)
-- `--word-timestamps`: Incluir timestamps a nivel de palabra
-- `--no-vad`: Desactivar segmentación VAD
-- `--overwrite`: Sobrescribir transcripciones existentes
-- `--database-url`: URL de base de datos (para usar Postgres en lugar de SQLite)
-- `--modal`: Forzar uso de Modal (default)
-- `--no-modal`: Ejecutar Whisper localmente en lugar de Modal
+- `--config`: Path to YAML configuration file (default: `./config.yaml`)
+- `--audio-folder`: Folder containing audio files
+- `--output`: Directory to save transcription JSONs (default: `{audio-folder}/transcriptions`)
+- `--model`: Whisper model to use (default: from config.yaml)
+- `--language`: Transcription language (e.g., `es`, `en`, `auto`)
+- `--batch-size`: Batch size for inference (default: 8)
+- `--word-timestamps`: Include word-level timestamps
+- `--no-vad`: Disable VAD segmentation
+- `--overwrite`: Overwrite existing transcriptions
+- `--database-url`: Database URL (to use Postgres instead of SQLite)
+- `--modal`: Force Modal usage (default)
+- `--no-modal`: Run Whisper locally instead of Modal
 
-## Formato de Salida
+## Output Format
 
-### JSON de transcripción
+### Transcription JSON
 
-Cada archivo de audio genera un JSON con esta estructura:
+Each audio file generates a JSON with this structure:
 
 ```json
 {
@@ -110,17 +110,17 @@ Cada archivo de audio genera un JSON con esta estructura:
     {
       "start": 0.0,
       "end": 5.2,
-      "text": "Hola, esto es una prueba.",
+      "text": "Hello, this is a test.",
       "words": [
         {
           "start": 0.0,
           "end": 0.5,
-          "text": "Hola"
+          "text": "Hello"
         },
         {
           "start": 0.6,
           "end": 1.0,
-          "text": "esto"
+          "text": "this"
         }
       ]
     }
@@ -128,52 +128,52 @@ Cada archivo de audio genera un JSON con esta estructura:
 }
 ```
 
-### Base de datos
+### Database
 
-Los segmentos también se guardan en la base de datos con estos campos:
+Segments are also saved to the database with these fields:
 
-- `audio_path`: Ruta relativa del audio
-- `start_timestamp`: Inicio del segmento (segundos)
-- `end_timestamp`: Fin del segmento (segundos)
-- `text`: Transcripción del segmento
-- `username`: Usuario que creó la transcripción
-- `timestamp`: Timestamp de creación
-- `marked`: Flag booleano para marcar clips
+- `audio_path`: Relative audio path
+- `start_timestamp`: Segment start time (seconds)
+- `end_timestamp`: Segment end time (seconds)
+- `text`: Segment transcription
+- `username`: User who created the transcription
+- `timestamp`: Creation timestamp
+- `marked`: Boolean flag to mark clips
 
-## Configuración Avanzada
+## Advanced Configuration
 
-### Personalizar parámetros VAD
+### Customize VAD Parameters
 
-Puedes ajustar la segmentación VAD editando los parámetros en `src/fast_audio_annotate/transcription.py`:
+You can adjust VAD segmentation by editing the parameters in `src/fast_audio_annotate/transcription.py`:
 
 ```python
 DEFAULT_SERVER_VAD = {
-    "aggressiveness": 2,        # 0-3, más alto = más agresivo
-    "frame_ms": 30,             # Tamaño de frame en ms
-    "min_speech_ms": 150,       # Mínimo de voz para iniciar segmento
-    "min_silence_ms": 300,      # Mínimo de silencio para terminar segmento
-    "max_chunk_ms": 30000,      # Máximo tamaño de chunk (30s)
-    "padding_ms": 200,          # Padding al inicio/fin de cada segmento
+    "aggressiveness": 2,        # 0-3, higher = more aggressive
+    "frame_ms": 30,             # Frame size in ms
+    "min_speech_ms": 150,       # Minimum speech to start segment
+    "min_silence_ms": 300,      # Minimum silence to end segment
+    "max_chunk_ms": 30000,      # Maximum chunk size (30s)
+    "padding_ms": 200,          # Padding at start/end of each segment
 }
 ```
 
-### Cambiar GPU en Modal
+### Change GPU in Modal
 
-Edita `src/fast_audio_annotate/modal_transcription.py`:
+Edit `src/fast_audio_annotate/modal_transcription.py`:
 
 ```python
 @app.cls(gpu="L40S", timeout=60*10, scaledown_window=5, max_containers=10)
 ```
 
-Opciones de GPU:
-- `"L4"`: GPU económica, 24GB VRAM
-- `"L40S"`: Recomendada, 48GB VRAM (default)
-- `"A100"`: GPU potente, 40GB/80GB VRAM
-- `"H100"`: GPU más potente, 80GB VRAM
+GPU options:
+- `"L4"`: Budget GPU, 24GB VRAM
+- `"L40S"`: Recommended, 48GB VRAM (default)
+- `"A100"`: Powerful GPU, 40GB/80GB VRAM
+- `"H100"`: Most powerful GPU, 80GB VRAM
 
-### Usar base de datos PostgreSQL
+### Use PostgreSQL Database
 
-Para producción, puedes usar Neon o cualquier PostgreSQL:
+For production, you can use Neon or any PostgreSQL:
 
 ```bash
 export NEON_DATABASE_URL="postgresql://user:pass@host/db"
@@ -182,7 +182,7 @@ python scripts/preprocess_audio.py \
   --audio-folder ./audio
 ```
 
-O especificar directamente:
+Or specify directly:
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -202,64 +202,64 @@ pip install modal==1.2.1
 
 ```bash
 modal setup
-# Luego sigue las instrucciones para autenticarte
+# Follow the instructions to authenticate
 ```
 
-### Los segmentos son muy largos
+### Segments are too long
 
-Ajusta `max_chunk_ms` en `DEFAULT_SERVER_VAD` a un valor menor (ej: 15000 para 15s)
+Adjust `max_chunk_ms` in `DEFAULT_SERVER_VAD` to a lower value (e.g., 15000 for 15s)
 
-### Los segmentos son muy cortos
+### Segments are too short
 
-Aumenta `min_speech_ms` para requerir más tiempo de voz antes de crear un segmento
+Increase `min_speech_ms` to require more speech time before creating a segment
 
-### Modelo no encontrado
+### Model not found
 
-Asegúrate de que el modelo existe en Hugging Face:
+Make sure the model exists on Hugging Face:
 - `openai/whisper-large-v3`
 - `openai/whisper-large-v3-turbo`
 - `openai/whisper-medium`
 - `openai/whisper-small`
 
-## Arquitectura
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
 │  Local: preprocess_audio.py                │
-│  - Carga audio                              │
-│  - Aplica VAD para crear segmentos         │
-│  - Envía segmentos a Modal                 │
+│  - Load audio                               │
+│  - Apply VAD to create segments            │
+│  - Send segments to Modal                  │
 └────────────────┬────────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────────┐
 │  Modal: WhisperModel                        │
 │  - GPU: L40S                                │
-│  - Batched inference (hasta 64 samples)     │
-│  - Retorna transcripciones con timestamps   │
+│  - Batched inference (up to 64 samples)    │
+│  - Returns transcriptions with timestamps  │
 └────────────────┬────────────────────────────┘
                  │
                  ▼
 ┌─────────────────────────────────────────────┐
-│  Local: Guardar resultados                  │
-│  - JSON con segmentos                       │
-│  - Base de datos (SQLite/PostgreSQL)        │
+│  Local: Save results                        │
+│  - JSON with segments                       │
+│  - Database (SQLite/PostgreSQL)             │
 └─────────────────────────────────────────────┘
 ```
 
-## Comparación: Local vs Modal
+## Comparison: Local vs Modal
 
-| Aspecto              | Local (--no-modal) | Modal (default)     |
-|----------------------|--------------------|---------------------|
-| GPU requerida        | ✅ Sí              | ❌ No               |
-| Velocidad            | Depende del HW     | Rápido (L40S)       |
-| Costo                | $0 (tu HW)         | ~$1.20/hora GPU     |
-| Paralelización       | Limitada           | ✅ Auto-scaling     |
-| Setup                | CUDA, drivers, etc | `modal setup`       |
+| Aspect              | Local (--no-modal) | Modal (default)     |
+|---------------------|--------------------|---------------------|
+| GPU required        | ✅ Yes             | ❌ No               |
+| Speed               | Depends on HW      | Fast (L40S)         |
+| Cost                | $0 (your HW)       | ~$1.20/hour GPU     |
+| Parallelization     | Limited            | ✅ Auto-scaling     |
+| Setup               | CUDA, drivers, etc | `modal setup`       |
 
-## Ejemplos de Uso
+## Usage Examples
 
-### Ejemplo 1: Transcripción básica en español
+### Example 1: Basic Spanish transcription
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -268,7 +268,7 @@ python scripts/preprocess_audio.py \
   --language es
 ```
 
-### Ejemplo 2: Análisis detallado con word timestamps
+### Example 2: Detailed analysis with word timestamps
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -279,7 +279,7 @@ python scripts/preprocess_audio.py \
   --batch-size 16
 ```
 
-### Ejemplo 3: Re-procesar con modelo diferente
+### Example 3: Re-process with different model
 
 ```bash
 python scripts/preprocess_audio.py \
@@ -288,10 +288,10 @@ python scripts/preprocess_audio.py \
   --overwrite
 ```
 
-## Contribuir
+## Contributing
 
-Para reportar issues o contribuir, visita el repositorio en GitHub.
+To report issues or contribute, visit the repository on GitHub.
 
-## Licencia
+## License
 
-Ver archivo LICENSE.
+See LICENSE file.
