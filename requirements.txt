@@ -1,0 +1,5 @@
+python-fasthtml==0.12.33
+modal==1.2.1
+simple-parsing==0.1.7
+psycopg[binary,pool]
+ptyhon-dotenv

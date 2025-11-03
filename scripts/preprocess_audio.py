@@ -23,7 +23,6 @@ from fast_audio_annotate.config import AppConfig, parse_app_config
 from fast_audio_annotate.metadata import iter_audio_files
 from fast_audio_annotate.modal_transcription import ModalWhisperTranscriber
 from fast_audio_annotate.transcription import WhisperTranscriber
-
 from db_backend import DatabaseBackend
 
 
@@ -117,25 +116,15 @@ def main() -> None:
     audio_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.use_modal:
-        print("Using Modal-backed Whisper transcriber.")
-        transcriber: Union[WhisperTranscriber, ModalWhisperTranscriber]
-        transcriber = ModalWhisperTranscriber(
-            model_name,
-            language=language,
-            return_word_timestamps=args.word_timestamps,
-            chunking_strategy=chunking_strategy,
-            batch_size=args.batch_size,
-        )
-    else:
-        print("Using local Whisper transcriber (Modal disabled).")
-        transcriber = WhisperTranscriber(
-            model_name,
-            language=language,
-            return_word_timestamps=args.word_timestamps,
-            chunking_strategy=chunking_strategy,
-            batch_size=args.batch_size,
-        )
+
+    transcriber: Union[WhisperTranscriber, ModalWhisperTranscriber]
+    transcriber = ModalWhisperTranscriber(
+        model_name,
+        language=language,
+        return_word_timestamps=args.word_timestamps,
+        chunking_strategy=chunking_strategy,
+        batch_size=args.batch_size,
+    )
 
     db_backend = DatabaseBackend(audio_dir / "annotations.db", database_url)
     print(f"Using database backend: {db_backend.backend_label()}")

@@ -8,6 +8,9 @@ import sys
 import json
 from datetime import datetime
 
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file if present
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 SRC_DIR = ROOT_DIR / "src"
