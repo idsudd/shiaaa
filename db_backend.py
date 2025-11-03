@@ -503,6 +503,82 @@ class DatabaseBackend:
         finally:
             conn.close()
 
+    def get_contributor_stats(self) -> dict:
+        """Get statistics about contributors and their contributions."""
+        try:
+            if self.backend == "sqlite":
+                with self._sqlite_conn() as conn:
+                    cursor = conn.cursor()
+                    
+                    # Get total number of reviewed clips with non-anonymous contributors
+                    cursor.execute("""
+                        SELECT 
+                            username,
+                            COUNT(*) as contributions,
+                            COUNT(CASE WHEN human_reviewed = 1 THEN 1 END) as reviewed_clips
+                        FROM clips 
+                        WHERE username != 'unknown' AND username != '' AND username IS NOT NULL
+                        GROUP BY username 
+                        ORDER BY contributions DESC
+                    """)
+                    
+                    contributors = []
+                    total_contributions = 0
+                    
+                    for row in cursor.fetchall():
+                        username, contributions, reviewed = row
+                        contributors.append({
+                            "name": username,
+                            "contributions": contributions,
+                            "reviewed_clips": reviewed
+                        })
+                        total_contributions += contributions
+                    
+                    return {
+                        "total_contributors": len(contributors),
+                        "total_contributions": total_contributions,
+                        "contributors": contributors
+                    }
+                    
+            else:  # postgres
+                with self._postgres_cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            username,
+                            COUNT(*) as contributions,
+                            COUNT(CASE WHEN human_reviewed = true THEN 1 END) as reviewed_clips
+                        FROM clips 
+                        WHERE username != 'unknown' AND username != '' AND username IS NOT NULL
+                        GROUP BY username 
+                        ORDER BY contributions DESC
+                    """)
+                    
+                    contributors = []
+                    total_contributions = 0
+                    
+                    for row in cur.fetchall():
+                        username, contributions, reviewed = row
+                        contributors.append({
+                            "name": username,
+                            "contributions": contributions,
+                            "reviewed_clips": reviewed
+                        })
+                        total_contributions += contributions
+                    
+                    return {
+                        "total_contributors": len(contributors),
+                        "total_contributions": total_contributions,
+                        "contributors": contributors
+                    }
+                    
+        except Exception as e:
+            print(f"Error getting contributor stats: {e}")
+            return {
+                "total_contributors": 0,
+                "total_contributions": 0,
+                "contributors": []
+            }
+
     @staticmethod
     def _row_to_clip(row: Iterable) -> ClipRecord:
         """Convert a database row to a ClipRecord."""

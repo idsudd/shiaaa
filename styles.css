@@ -199,3 +199,50 @@ select {
 wavesurfer-region {
     z-index: 3;
 }
+
+/* HTMX Loading indicators */
+.htmx-indicator {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.htmx-request .htmx-indicator {
+    display: inline-block;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+/* Button hover effects for better UX */
+.next-btn:hover {
+    background: #e0a800 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.complete-btn:hover {
+    background: #0b5ed7 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.flag-btn:hover {
+    background: #bb2d3b !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Disable buttons during loading */
+.htmx-request button {
+    opacity: 0.7;
+    pointer-events: none;
+}

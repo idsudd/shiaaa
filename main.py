@@ -53,9 +53,22 @@ app, rt = fast_app(
 
 
 # Helper functions
-def get_username() -> str:
-    """Return the username for audit purposes."""
+def get_username(contributor_name: str = "") -> str:
+    """Return the username for audit purposes, preferring contributor name."""
+    if contributor_name and contributor_name.strip():
+        return contributor_name.strip()
     return os.environ.get('USER') or os.environ.get('USERNAME') or 'unknown'
+
+
+def get_contributor_stats() -> dict:
+    """Get statistics about contributors."""
+    try:
+        # Get contributor counts from database
+        stats = db_backend.get_contributor_stats()
+        return stats
+    except Exception as e:
+        print(f"Error getting contributor stats: {e}")
+        return {"total_contributors": 0, "total_contributions": 0, "contributors": []}
 
 
 def get_audio_metadata(audio_path: Optional[str]) -> Optional[dict]:
@@ -215,6 +228,21 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 placeholder="Type the corrected transcription here...",
                 style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; resize: vertical;",
             ),
+            style="margin-bottom: 16px;"
+        ),
+        Div(
+            Label("Your name (optional)", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px; color: #495057;"),
+            Input(
+                value=clip.username if hasattr(clip, 'username') and clip.username and clip.username != 'unknown' else "",
+                name="contributor_name",
+                id="contributor-name-input",
+                placeholder="Enter your name to be credited as a contributor...",
+                style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px;",
+            ),
+            Div(
+                "💡 Your name will be used to credit your contributions to this project!",
+                style="font-size: 12px; color: #6c757d; margin-top: 4px; font-style: italic;"
+            ),
             style="margin-bottom: 20px;"
         ),
         id="clip-form"
@@ -222,13 +250,14 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     actions = Div(
         Button(
-            "💾 Save progress",
-            cls="save-btn",
-            hx_post="/save_clip",
+            "➡️ Next clip",
+            cls="next-btn",
+            hx_post="/next_clip",
             hx_include="#clip-form input, #clip-form textarea",
             hx_target="#main-content",
             hx_swap="outerHTML",
-            style="padding: 12px 18px; border-radius: 6px; background: #198754; color: white; border: none; font-size: 15px; cursor: pointer;"
+            hx_indicator="#loading-next",
+            style="padding: 12px 18px; border-radius: 6px; background: #ffc107; color: #000; border: none; font-size: 15px; cursor: pointer;"
         ),
         Button(
             "✅ Finish review",
@@ -237,6 +266,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             hx_include="#clip-form input, #clip-form textarea",
             hx_target="#main-content",
             hx_swap="outerHTML",
+            hx_indicator="#loading-complete",
             style="padding: 12px 18px; border-radius: 6px; background: #0d6efd; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
         Button(
@@ -247,9 +277,29 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             hx_confirm="Report this clip as problematic?",
             hx_target="#main-content",
             hx_swap="outerHTML",
+            hx_indicator="#loading-flag",
             style="padding: 12px 18px; border-radius: 6px; background: #dc3545; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
-        style="display: flex; gap: 12px; flex-wrap: wrap;"
+        # Loading indicators
+        Div(
+            "🔄 Loading next clip...",
+            id="loading-next",
+            cls="htmx-indicator",
+            style="padding: 8px 12px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404; font-size: 14px;"
+        ),
+        Div(
+            "✅ Completing review...",
+            id="loading-complete", 
+            cls="htmx-indicator",
+            style="padding: 8px 12px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460; font-size: 14px;"
+        ),
+        Div(
+            "🚩 Reporting issue...",
+            id="loading-flag",
+            cls="htmx-indicator", 
+            style="padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24; font-size: 14px;"
+        ),
+        style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;"
     )
 
     waveform = Div(
@@ -332,17 +382,71 @@ def render_main_content(clip: Optional[ClipRecord]) -> Div:
     return render_empty_state()
 
 
+def render_contributor_stats() -> Div:
+    """Render a panel showing contributor statistics."""
+    try:
+        stats = get_contributor_stats()
+        
+        if stats["total_contributors"] == 0:
+            return Div(
+                H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
+                P("Be the first to contribute! Enter your name when reviewing clips to be credited.",
+                  style="color: #6c757d; font-style: italic;"),
+                cls="contributor-stats-panel",
+                style=(
+                    "margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #e9ecef; "
+                    "border-radius: 8px;"
+                ),
+            )
+        
+        # Show top contributors (limit to top 5)
+        top_contributors = stats["contributors"][:5]
+        
+        contributor_list = []
+        for i, contributor in enumerate(top_contributors):
+            rank_emoji = ["🥇", "🥈", "🥉", "🏅", "⭐"][i] if i < 5 else "✨"
+            contributor_list.append(
+                Div(
+                    Span(f"{rank_emoji} {contributor['name']}", style="font-weight: 600;"),
+                    Span(f" - {contributor['contributions']} contributions", style="color: #6c757d; margin-left: 8px;"),
+                    style="margin-bottom: 4px;"
+                )
+            )
+        
+        return Div(
+            H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
+            Div(
+                P(f"Total contributors: {stats['total_contributors']} | Total contributions: {stats['total_contributions']}",
+                  style="margin-bottom: 12px; font-weight: 500; color: #495057;"),
+                *contributor_list,
+                style="margin-bottom: 8px;"
+            ),
+            P("Thank you to everyone who has contributed to improving this dataset! 🎉",
+              style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"),
+            cls="contributor-stats-panel",
+            style=(
+                "margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #e9ecef; "
+                "border-radius: 8px;"
+            ),
+        )
+    except Exception as e:
+        print(f"Error rendering contributor stats: {e}")
+        return Div()  # Return empty div on error
+
+
 # Routes
 @rt("/")
 def index():
     """Main entry point for the crowdsourced clip review interface."""
     clip = select_random_clip()
     main_content = render_main_content(clip)
+    contributor_stats = render_contributor_stats()
 
     return Titled(
         config.title,
         Div(
             H1("Clip review"),
+            contributor_stats,
             main_content,
             cls="container"
         ),
@@ -522,11 +626,12 @@ def index():
     )
 
 
-@rt("/save_clip", methods=["POST"])
-def save_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0", transcription: str = ""):
-    """Persist current progress for the active clip."""
-    clip = get_clip(clip_id)
-    if clip:
+@rt("/next_clip", methods=["POST"])
+def next_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0", transcription: str = "", contributor_name: str = ""):
+    """Move to the next random clip without completing the current one."""
+    # Optionally save current progress before moving to next clip
+    current_clip = get_clip(clip_id)
+    if current_clip:
         try:
             start = float(start_time)
             end = float(end_time)
@@ -536,17 +641,19 @@ def save_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0", tra
                     'end_timestamp': end,
                     'text': transcription,
                     'timestamp': datetime.now().isoformat(),
-                    'username': get_username(),
+                    'username': get_username(contributor_name),
                 }
-                db_backend.update_clip(clip.id, updates)
-                clip = get_clip(clip_id)
+                db_backend.update_clip(current_clip.id, updates)
         except ValueError:
             pass
-    return render_main_content(clip)
+    
+    # Get a new random clip
+    next_clip = select_random_clip()
+    return render_main_content(next_clip)
 
 
 @rt("/complete_clip", methods=["POST"])
-def complete_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0", transcription: str = ""):
+def complete_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0", transcription: str = "", contributor_name: str = ""):
     """Finalize a clip as human reviewed and move to another task."""
     clip = get_clip(clip_id)
     if clip:
@@ -559,7 +666,7 @@ def complete_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0",
                     'end_timestamp': end,
                     'text': transcription,
                     'timestamp': datetime.now().isoformat(),
-                    'username': get_username(),
+                    'username': get_username(contributor_name),
                     'human_reviewed': True,
                     'marked': False,
                 }
@@ -571,14 +678,14 @@ def complete_clip(clip_id: str = "", start_time: str = "0", end_time: str = "0",
 
 
 @rt("/flag_clip", methods=["POST"])
-def flag_clip(clip_id: str = "", transcription: str = "", start_time: str = "0", end_time: str = "0"):
+def flag_clip(clip_id: str = "", transcription: str = "", start_time: str = "0", end_time: str = "0", contributor_name: str = ""):
     """Mark a clip as problematic so it disappears from the review queue."""
     clip = get_clip(clip_id)
     if clip:
         updates = {
             'text': transcription,
             'timestamp': datetime.now().isoformat(),
-            'username': get_username(),
+            'username': get_username(contributor_name),
             'marked': True,
         }
         try:
