@@ -499,7 +499,13 @@ def index():
                     container: '#timeline',
                 }));
 
-                wavesurfer.load('/""" + f"{config.audio_folder}" + """/' + audioPath);
+                // Construct audio URL - use full URL if config.audio_folder is a URL, otherwise use local path
+                const audioFolder = '""" + f"{config.audio_folder}" + """';
+                const audioUrl = audioFolder.startsWith('http') 
+                    ? audioFolder + '/' + audioPath
+                    : '/' + audioFolder + '/' + audioPath;
+                
+                wavesurfer.load(audioUrl);
 
                 wavesurfer.on('ready', () => {
                     wsRegions.clearRegions();
@@ -717,35 +723,37 @@ def get_styles():
     return Response("/* Styles not found */", media_type="text/css")
 
 
-@rt(f"/{config.audio_folder}/{{audio_name:path}}")
-def get_audio(audio_name: str):
-    """Serve audio files with security checks."""
-    # Check for path traversal attempts
-    if ".." in audio_name or audio_name.startswith("/"):
-        return Response("Invalid path", status_code=400)
+# Only create local audio route if audio_folder is a local path (not a URL)
+if not config.audio_folder.startswith(('http://', 'https://')):
+    @rt(f"/{config.audio_folder}/{{audio_name:path}}")
+    def get_audio(audio_name: str):
+        """Serve audio files with security checks."""
+        # Check for path traversal attempts
+        if ".." in audio_name or audio_name.startswith("/"):
+            return Response("Invalid path", status_code=400)
 
-    # Validate file extension
-    valid_exts = ('.webm', '.mp3', '.wav', '.ogg', '.m4a', '.flac')
-    if not audio_name.lower().endswith(valid_exts):
-        return Response("Invalid file type", status_code=400)
+        # Validate file extension
+        valid_exts = ('.webm', '.mp3', '.wav', '.ogg', '.m4a', '.flac')
+        if not audio_name.lower().endswith(valid_exts):
+            return Response("Invalid file type", status_code=400)
 
-    audio_path = Path(config.audio_folder) / audio_name
+        audio_path = Path(config.audio_folder) / audio_name
 
-    # Ensure the resolved path is within audio directory
-    try:
-        audio_dir = Path(config.audio_folder).resolve()
-        resolved_path = audio_path.resolve()
-        if not str(resolved_path).startswith(str(audio_dir)):
-            return Response("Access denied", status_code=403)
-    except Exception:
-        return Response("Invalid path", status_code=400)
+        # Ensure the resolved path is within audio directory
+        try:
+            audio_dir = Path(config.audio_folder).resolve()
+            resolved_path = audio_path.resolve()
+            if not str(resolved_path).startswith(str(audio_dir)):
+                return Response("Access denied", status_code=403)
+        except Exception:
+            return Response("Invalid path", status_code=400)
 
-    if audio_path.exists():
-        return FileResponse(
-            str(audio_path),
-            headers={"Cache-Control": "public, max-age=3600"}
-        )
-    return Response("Audio not found", status_code=404)
+        if audio_path.exists():
+            return FileResponse(
+                str(audio_path),
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
+        return Response("Audio not found", status_code=404)
 
 
 def get_asgi_app():
