@@ -315,6 +315,7 @@ else:  # create a modal app for deployment
         ),
         volumes={"/data": data_volume},
         allow_concurrent_inputs=100,
+        secrets=[modal.Secret.from_dotenv()]
     )
     @modal.asgi_app()
     def serve():
