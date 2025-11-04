@@ -504,20 +504,20 @@ class DatabaseBackend:
             conn.close()
 
     def get_contributor_stats(self) -> dict:
-        """Get statistics about contributors and their contributions."""
+        """Get statistics about contributors and their contributions (only human_reviewed clips)."""
         try:
             if self.backend == "sqlite":
                 with self._sqlite_conn() as conn:
                     cursor = conn.cursor()
                     
-                    # Get total number of reviewed clips with non-anonymous contributors
+                    # Get only human_reviewed clips with non-anonymous contributors
                     cursor.execute("""
                         SELECT 
                             username,
-                            COUNT(CASE WHEN human_reviewed = 1 THEN 1 END) as contributions,
-                            COUNT(CASE WHEN human_reviewed = 1 THEN 1 END) as reviewed_clips
+                            COUNT(*) as contributions
                         FROM clips 
                         WHERE username != 'unknown' AND username != '' AND username IS NOT NULL
+                        AND human_reviewed = 1
                         GROUP BY username 
                         ORDER BY contributions DESC
                     """)
@@ -526,11 +526,11 @@ class DatabaseBackend:
                     total_contributions = 0
                     
                     for row in cursor.fetchall():
-                        username, contributions, reviewed = row
+                        username, contributions = row
                         contributors.append({
                             "name": username,
                             "contributions": contributions,
-                            "reviewed_clips": reviewed
+                            "reviewed_clips": contributions  # Same as contributions since we only count reviewed clips
                         })
                         total_contributions += contributions
                     
@@ -545,10 +545,10 @@ class DatabaseBackend:
                     cur.execute("""
                         SELECT 
                             username,
-                            COUNT(*) as contributions,
-                            COUNT(CASE WHEN human_reviewed = true THEN 1 END) as reviewed_clips
+                            COUNT(*) as contributions
                         FROM clips 
                         WHERE username != 'unknown' AND username != '' AND username IS NOT NULL
+                        AND human_reviewed = true
                         GROUP BY username 
                         ORDER BY contributions DESC
                     """)
@@ -557,11 +557,11 @@ class DatabaseBackend:
                     total_contributions = 0
                     
                     for row in cur.fetchall():
-                        username, contributions, reviewed = row
+                        username, contributions = row
                         contributors.append({
                             "name": username,
                             "contributions": contributions,
-                            "reviewed_clips": reviewed
+                            "reviewed_clips": contributions  # Same as contributions since we only count reviewed clips
                         })
                         total_contributions += contributions
                     
