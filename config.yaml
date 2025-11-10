@@ -1,6 +1,6 @@
 title: "Audio Annotation Tool"
 description: "Annotate audio clips with transcriptions"
-audio_folder: "https://storage.googleapis.com/audios-asr-cl"
+audio_folder: "audio"
 max_history: 10
 metadata_filename: "metadata.json"
 whisper_model: "whisper-1"

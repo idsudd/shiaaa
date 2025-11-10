@@ -34,6 +34,7 @@ AUDIO_EXTENSIONS = {
 }
 
 from db_backend import DatabaseBackend  # noqa: E402  pylint: disable=wrong-import-position
+from src.fast_audio_annotate.metadata import load_audio_metadata_from_file  # noqa: E402  pylint: disable=wrong-import-position
 
 
 @dataclass(frozen=True)
@@ -349,6 +350,10 @@ def main() -> None:
 
     db_backend = DatabaseBackend(audio_dir / "annotations.db", database_url)
     print(f"Using database backend: {db_backend.backend_label()}")
+
+    # Load metadata from metadata.json if it exists
+    metadata_filename = config_data.get("metadata_filename", "metadata.json")
+    load_audio_metadata_from_file(audio_dir, db_backend, metadata_filename)
 
     username = get_username()
     audio_files = list(iter_audio_files(audio_dir))
