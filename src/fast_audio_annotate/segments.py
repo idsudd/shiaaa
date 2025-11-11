@@ -66,14 +66,16 @@ def generate_segment(
     )
     segment_duration = segment_end - segment_start
 
-    segment_dir = audio_root / segment_dir_name
-    segment_dir.mkdir(parents=True, exist_ok=True)
+    # Create subdirectory for each audio file (without extension)
+    audio_name = source_path.stem  # Gets filename without extension
+    segment_subdir = audio_root / segment_dir_name / audio_name
+    segment_subdir.mkdir(parents=True, exist_ok=True)
 
     suffix = source_path.suffix or ".webm"
     segment_filename = (
         f"clip_{clip_id}_{int(segment_start * 1000):010d}_{int(segment_end * 1000):010d}{suffix}"
     )
-    output_path = segment_dir / segment_filename
+    output_path = segment_subdir / segment_filename
 
     command = [
         ffmpeg_binary,
@@ -97,7 +99,7 @@ def generate_segment(
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:  # pragma: no cover - runtime
         raise SegmentGenerationError(str(exc)) from exc
 
-    relative_path = str(Path(segment_dir_name) / output_path.name).replace("\\", "/")
+    relative_path = str(Path(segment_dir_name) / audio_name / output_path.name).replace("\\", "/")
 
     return SegmentGenerationResult(
         relative_path=relative_path,

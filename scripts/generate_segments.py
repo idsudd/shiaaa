@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import sys
 import textwrap
@@ -12,9 +13,16 @@ from typing import Iterable, Optional
 
 import yaml
 
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file if present
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from db_backend import ClipRecord, DatabaseBackend
-from fast_audio_annotate.config import AppConfig
-from fast_audio_annotate.segments import (
+from src.fast_audio_annotate.config import AppConfig
+from src.fast_audio_annotate.segments import (
     SegmentGenerationError,
     generate_segment,
     locate_ffmpeg,
@@ -23,7 +31,7 @@ from fast_audio_annotate.segments import (
 
 
 DEFAULT_CONFIG_PATH = "config.yaml"
-DEFAULT_PADDING_SECONDS = 5.0
+DEFAULT_PADDING_SECONDS = 2.0
 DEFAULT_SEGMENT_SUBDIR = "segments"
 
 
@@ -127,10 +135,19 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
 
     audio_root = Path(app_config.audio_folder)
     if not audio_root.is_absolute():
-        audio_root = (Path.cwd() / audio_root).resolve()
+        # Always resolve relative paths from the project root, not from current working directory
+        audio_root = (ROOT_DIR / audio_root).resolve()
 
     sqlite_path = audio_root / "annotations.db"
-    db_backend = DatabaseBackend(sqlite_path, app_config.database_url)
+    
+    # Resolve database URL from config, environment variables, or default to SQLite
+    database_url = (
+        app_config.database_url
+        or os.environ.get("DATABASE_URL")
+        or os.environ.get("NEON_DATABASE_URL")
+    )
+    
+    db_backend = DatabaseBackend(sqlite_path, database_url)
 
     ffmpeg_binary = args.ffmpeg_binary or locate_ffmpeg()
     if ffmpeg_binary is None:
