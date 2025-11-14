@@ -90,7 +90,7 @@ def render_audio_metadata_panel(metadata: Optional[dict]):
     labels = [
         ("date", "Fecha"),
         ("event", "Show"),
-        ("artista", "Artista"),
+        ("artist", "Artista"),
     ]
 
     rows = []
