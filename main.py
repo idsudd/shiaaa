@@ -23,6 +23,7 @@ from fast_audio_annotate.segments import compute_segment_window
 from db_backend import ClipRecord, DatabaseBackend
 
 config: AppConfig = parse_app_config()
+APP_BRAND = "¡shiaaa!"
 
 # Database setup
 database_url = (
@@ -82,50 +83,6 @@ def get_audio_metadata(audio_path: Optional[str]) -> Optional[dict]:
 
     record = db_backend.fetch_audio_metadata(str(audio_path))
     return record.metadata if record else None
-
-
-def render_audio_metadata_panel(metadata: Optional[dict]):
-    """Render a panel summarizing audio metadata."""
-
-    labels = [
-        ("date", "Fecha"),
-        ("event", "Show"),
-        ("artist", "Artista"),
-    ]
-
-    rows = []
-    if metadata:
-        for key, label in labels:
-            value = metadata.get(key)
-            if value not in (None, ""):
-                rows.append(
-                    Div(
-                        Span(label, style="font-weight: 600; min-width: 90px;"),
-                        Span(str(value), style="color: #495057;"),
-                        style="display: flex; gap: 8px; align-items: center;",
-                    )
-                )
-
-    if not rows:
-        body = P(
-            "Sin datos extra para este clip.",
-            style="color: #6c757d; font-style: italic; margin: 0;",
-        )
-    else:
-        body = Div(
-            *rows,
-            style="display: flex; flex-direction: column; gap: 4px;",
-        )
-
-    return Div(
-        H4("Detalles rápidos", style="margin-bottom: 8px; color: #343a40;"),
-        body,
-        cls="audio-metadata-panel",
-        style=(
-            "margin-bottom: 20px; padding: 15px; background: #ffffff; border: 1px solid #dee2e6; "
-            "border-radius: 8px;"
-        ),
-    )
 
 
 def select_random_clip() -> Optional[ClipRecord]:
@@ -303,17 +260,36 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     intro = Div(
         H2("Vamos a anotar este clip", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
-            "Escucha lo que está marcado, corregí el texto y mové los cortes si hace falta. Lo importante es dejar la "
-            "anotación lista para que otra persona la pueda usar al toque.",
+            "Escucha el audio, corrige el texto y ajusta los cortes de tiempo si es necesario.",
             style="color: #495057; margin-bottom: 0;",
         ),
         style="margin-bottom: 18px; background: #f1f5ff; padding: 16px; border-radius: 10px;",
     )
 
+    metadata_line = None
+    if metadata:
+        artist = metadata.get("artist")
+        event = metadata.get("event")
+        date = metadata.get("date")
+        if artist and event and date:
+            metadata_line = P(
+                f"Audio extraído del show de {artist}, el {date} en el {event}",
+                style="margin: 4px 0 0; color: #6c757d;",
+            )
+
+    clip_info_children = [
+        Div(
+            Span(f"Clip #{clip.id}", style="font-weight: 600; color: #0d6efd;"),
+            Span(f"· {duration:.1f}s"),
+            style="display: flex; gap: 8px; align-items: center; color: #495057;",
+        )
+    ]
+    if metadata_line:
+        clip_info_children.append(metadata_line)
+
     clip_info = Div(
-        Span(f"Clip #{clip.id}", style="font-weight: 600; color: #0d6efd;"),
-        Span(f"· {duration:.1f}s"),
-        style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; color: #495057;",
+        *clip_info_children,
+        style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;",
     )
 
 
@@ -322,7 +298,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         Div(
             Div(
                 Label(
-                    "Inicio dentro del segmento (segundos)",
+                    "Inicio (segundos)",
                     style="display: block; margin-bottom: 4px; font-weight: 600;",
                 ),
                 Input(
@@ -348,7 +324,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             ),
             Div(
                 Label(
-                    "Fin dentro del segmento (segundos)",
+                    "Fin (segundos)",
                     style="display: block; margin-bottom: 4px; font-weight: 600;",
                 ),
                 Input(
@@ -406,16 +382,6 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     actions = Div(
         Button(
-            "➡️ Siguiente clip",
-            cls="next-btn",
-            hx_post="/next_clip",
-            hx_include="#clip-form input, #clip-form textarea",
-            hx_target="#main-content",
-            hx_swap="outerHTML",
-            hx_indicator="#loading-next",
-            style="padding: 12px 18px; border-radius: 6px; background: #ffc107; color: #000; border: none; font-size: 15px; cursor: pointer;"
-        ),
-        Button(
             "💾 Guardar anotación",
             cls="complete-btn",
             hx_post="/complete_clip",
@@ -426,11 +392,21 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="padding: 12px 18px; border-radius: 6px; background: #0d6efd; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
         Button(
-            "🚩 Marcar clip",
+            "➡️ Siguiente clip",
+            cls="next-btn",
+            hx_post="/next_clip",
+            hx_include="#clip-form input, #clip-form textarea",
+            hx_target="#main-content",
+            hx_swap="outerHTML",
+            hx_indicator="#loading-next",
+            style="padding: 12px 18px; border-radius: 6px; background: #ffc107; color: #000; border: none; font-size: 15px; cursor: pointer;"
+        ),
+        Button(
+            "🚩 Clip raro",
             cls="flag-btn",
             hx_post="/flag_clip",
             hx_include="#clip-form input, #clip-form textarea",
-            hx_confirm="¿Marcamos este clip para revisarlo después?",
+            hx_confirm="¿Marcamos este clip porque tiene algo raro?",
             hx_target="#main-content",
             hx_swap="outerHTML",
             hx_indicator="#loading-flag",
@@ -498,15 +474,12 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         style="margin-bottom: 24px;"
     )
 
-    metadata_panel = render_audio_metadata_panel(metadata)
-
     return Div(
         intro,
         clip_info,
         waveform,
         form_inputs,
         actions,
-        metadata_panel,
         id="main-content",
         data_clip_id=str(clip.id),
         data_audio_path=str(audio_path_for_playback),
@@ -620,7 +593,7 @@ def render_tab_shell(
             ranking_button,
             indicator,
             cls="tab-nav",
-            style="display: flex; gap: 8px; margin-bottom: 20px; align-items: center;",
+            style="display: flex; gap: 8px; margin-bottom: 20px; align-items: center; justify-content: flex-end;",
         ),
         *body_children,
         id="tab-shell",
@@ -994,17 +967,40 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
 
     tab_shell = render_tab_shell("anotar", clip, status_message)
 
-    body_children = [
-        H1("Anotador de clips", style="margin-bottom: 8px;"),
+    description_section = Div(
         P(
-            "Solo las herramientas esenciales para corregir timestamps y texto. Fácil, rápido y en español.",
-            style="margin-bottom: 20px; color: #6c757d;"
+            "Ayúdanos a construir la base de datos de audio en español chileno que nos permita entrenar nuevos modelos de código abierto.",
+            style="margin-bottom: 24px; color: #495057; font-size: 1.05rem;"
         ),
+        style="margin-bottom: 12px;"
+    )
+
+    about_section = Div(
+        H3("About", style="margin-bottom: 6px;"),
+        P(
+            "Si quiere conocer más de este proyecto o colaborar, escribe a ",
+            A("alonsoastroza@udd.cl", href="mailto:alonsoastroza@udd.cl", style="color: #0d6efd; font-weight: 600;"),
+            ".",
+            style="color: #495057; margin-bottom: 0;"
+        ),
+        style="margin-top: 32px; padding: 20px; border-radius: 12px; background: #f8f9fa;"
+    )
+
+    footer = Div(
+        "Una iniciativa del ",
+        A("Instituto de Data Science UDD", href="https://github.com/idsudd", target="_blank", rel="noopener", style="color: #0d6efd; font-weight: 600;"),
+        style="margin-top: 32px; text-align: center; color: #6c757d;"
+    )
+
+    body_children = [
+        description_section,
         tab_shell,
+        about_section,
+        footer,
     ]
 
     return Titled(
-        config.title,
+        APP_BRAND,
         Div(
             *body_children,
             cls="container"
