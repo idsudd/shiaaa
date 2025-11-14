@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Pre-generate trimmed audio segments for all clips in the database."""
+"""Pre-generate trimmed audio segments for all clips in the database.
+
+This script iterates over every clip stored in the annotations database and
+creates an audio snippet that includes a configurable amount of context
+around each clip. Existing snippets are reused unless --force is provided.
+
+The generated files live inside <audio_folder>/<segment_subdir>/<audio_name>/
+so they can be served by the annotation UI. For any timestamp measured in
+the segment file, you can recover the original time in the full audio with:
+
+    original_t = segment_t + segment_start_timestamp
+"""
 
 from __future__ import annotations
 
@@ -9,11 +20,11 @@ import os
 from pathlib import Path
 import sys
 import textwrap
-from typing import Iterable, Optional
+from typing import Iterable, Optional, List
 
 import yaml
-
 from dotenv import load_dotenv
+
 load_dotenv()  # Load environment variables from .env file if present
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -24,6 +35,7 @@ from db_backend import ClipRecord, DatabaseBackend
 from src.fast_audio_annotate.config import AppConfig
 from src.fast_audio_annotate.segments import (
     SegmentGenerationError,
+    SegmentGenerationResult,
     generate_segment,
     locate_ffmpeg,
     remove_previous_segment,
@@ -37,14 +49,14 @@ DEFAULT_SEGMENT_SUBDIR = "segments"
 
 def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate per-clip audio segments ahead of time.",
+        description="Generate per-clip audio segments for all clips in the database.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent(
             """
             The script iterates over every clip stored in the annotations database and
             creates an audio snippet that includes a configurable amount of context
             around each clip. Existing snippets are reused unless --force is
-            provided. All generated files live inside the <audio_folder>/segments
+            provided. All generated files live inside the <audio_folder>/<segment_subdir>
             directory so they can be served by the annotation UI.
             """
         ),
@@ -66,7 +78,7 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         "--padding",
         type=float,
         default=DEFAULT_PADDING_SECONDS,
-        help="Seconds of context to include before and after each clip.",
+        help="Seconds of context to include before and after each clip (default: %(default)s).",
     )
     parser.add_argument(
         "--segment-subdir",
@@ -87,6 +99,13 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Preview the actions without creating or updating any files.",
     )
+    parser.add_argument(
+        "--audio-path-filter",
+        help=(
+            "Optional audio_path filter. If provided, only clips whose audio_path "
+            "matches this value will be processed (e.g. 'routine_60.webm')."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -100,13 +119,29 @@ def load_config(path: Path) -> AppConfig:
 
 @dataclass
 class SegmentJob:
+    """Work item representing a clip and its source audio file."""
+
     clip: ClipRecord
     source_path: Path
 
 
-def collect_jobs(db: DatabaseBackend, audio_root: Path) -> list[SegmentJob]:
-    clips = db.fetch_all_clips()
-    jobs: list[SegmentJob] = []
+def collect_jobs(
+    db: DatabaseBackend,
+    audio_root: Path,
+    audio_path_filter: Optional[str] = None,
+) -> List[SegmentJob]:
+    """Collect all jobs to process, optionally filtering by audio_path.
+
+    If `audio_path_filter` is provided, only clips with that audio_path are fetched.
+    Otherwise, all clips in the database are considered.
+    """
+
+    if audio_path_filter:
+        clips = db.fetch_clips(audio_path_filter)
+    else:
+        clips = db.fetch_all_clips()
+
+    jobs: List[SegmentJob] = []
 
     for clip in clips:
         source_path = audio_root / clip.audio_path
@@ -115,15 +150,22 @@ def collect_jobs(db: DatabaseBackend, audio_root: Path) -> list[SegmentJob]:
             continue
         jobs.append(SegmentJob(clip=clip, source_path=source_path))
 
+    if audio_path_filter:
+        print(f"🎯 Collected {len(jobs)} clips for audio_path='{audio_path_filter}'")
+    else:
+        print(f"🎯 Collected {len(jobs)} clips across all audio files")
+
     return jobs
 
 
 def run(argv: Optional[Iterable[str]] = None) -> int:
     args = parse_args(argv)
 
+    # Load configuration file
     config_path = Path(args.config)
     app_config = load_config(config_path)
 
+    # Allow overriding config through CLI flags
     if args.audio_folder:
         app_config.audio_folder = args.audio_folder
     if args.database_url:
@@ -139,14 +181,14 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
         audio_root = (ROOT_DIR / audio_root).resolve()
 
     sqlite_path = audio_root / "annotations.db"
-    
+
     # Resolve database URL from config, environment variables, or default to SQLite
     database_url = (
         app_config.database_url
         or os.environ.get("DATABASE_URL")
         or os.environ.get("NEON_DATABASE_URL")
     )
-    
+
     db_backend = DatabaseBackend(sqlite_path, database_url)
 
     ffmpeg_binary = args.ffmpeg_binary or locate_ffmpeg()
@@ -154,9 +196,9 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
         print("Error: ffmpeg binary not found. Provide --ffmpeg-binary or install ffmpeg.")
         return 1
 
-    jobs = collect_jobs(db_backend, audio_root)
+    jobs = collect_jobs(db_backend, audio_root, args.audio_path_filter)
     if not jobs:
-        print("No clips found in the database. Nothing to do.")
+        print("No clips found to process. Nothing to do.")
         return 0
 
     generated = 0
@@ -166,6 +208,8 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
     for job in jobs:
         clip = job.clip
         existing_path = clip.segment_path
+
+        # If a segment already exists and --force is not used, reuse it
         if (
             not args.force
             and existing_path
@@ -178,16 +222,17 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
 
         if args.dry_run:
             print(
-                f"Would generate segment for clip {clip.id} ({clip.audio_path}:"
-                f" {clip.start_timestamp:.2f}s–{clip.end_timestamp:.2f}s)."
+                f"[DRY RUN] Would generate segment for clip {clip.id} "
+                f"({clip.audio_path}: {clip.start_timestamp:.2f}s–{clip.end_timestamp:.2f}s)."
             )
             skipped += 1
             continue
 
+        # If we are forcing regeneration, remove previous segment file (if any)
         remove_previous_segment(audio_root, existing_path if args.force else None)
 
         try:
-            result = generate_segment(
+            result: SegmentGenerationResult = generate_segment(
                 clip_id=clip.id,
                 audio_root=audio_root,
                 source_path=job.source_path,
@@ -202,6 +247,7 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
             failures += 1
             continue
 
+        # Persist mapping from clip -> segment in the database
         db_backend.upsert_clip_segment(
             clip.id,
             result.relative_path,
@@ -212,7 +258,7 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
 
     total = len(jobs)
     print(
-        f"Processed {total} clips: {generated} generated, {skipped} reused, {failures} failed."
+        f"Processed {total} clips: {generated} generated, {skipped} reused/skipped, {failures} failed."
     )
 
     return 0 if failures == 0 else 2

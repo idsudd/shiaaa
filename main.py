@@ -8,10 +8,6 @@ import sys
 import json
 from datetime import datetime
 
-try:
-    import modal
-except ImportError:  # pragma: no cover - optional dependency
-    modal = None
 
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file if present
@@ -38,15 +34,12 @@ database_url = (
 )
 db_backend = DatabaseBackend(config.audio_path / "annotations.db", database_url)
 
-
 load_audio_metadata_from_file(config.audio_path, db_backend, config.metadata_filename)
 
 # Runtime helpers for audio segments
-# Segment constants
 SEGMENT_PADDING_SECONDS = 2.0
 SEGMENT_SUBDIR_NAME = "segments"
 AUDIO_FOLDER_IS_REMOTE = config.audio_folder.startswith(("http://", "https://"))
-
 
 
 # Initialize FastHTML app with custom styles and scripts
@@ -76,7 +69,6 @@ def get_username(contributor_name: str = "") -> str:
 def get_contributor_stats() -> dict:
     """Get statistics about contributors."""
     try:
-        # Get contributor counts from database
         stats = db_backend.get_contributor_stats()
         return stats
     except Exception as e:
@@ -142,25 +134,22 @@ def render_audio_metadata_panel(metadata: Optional[dict]):
 
 
 def select_random_clip() -> Optional[ClipRecord]:
-    """Pick a random clip that still needs human review - filtered to routine_60.webm only."""
+    """Pick a random clip that still needs human review - currently filtered to routine_60.webm only."""
     import random
-    
-    # Get all clips that need review
+
     all_clips = db_backend.fetch_all_clips()
-    
-    # Filter to only routine_60.webm clips that need review
+
     routine_60_clips = [
-        clip for clip in all_clips 
-        if clip.audio_path == "routine_60.webm" 
-        and not clip.human_reviewed 
+        clip for clip in all_clips
+        if clip.audio_path == "routine_60.webm"
+        and not clip.human_reviewed
         and not clip.marked
     ]
-    
+
     if not routine_60_clips:
         print("🎯 No more routine_60.webm clips need review")
         return None
-    
-    # Pick a random clip from the filtered list
+
     clip = random.choice(routine_60_clips)
     print(f"🎯 Selected clip {clip.id} from routine_60.webm ({len(routine_60_clips)} clips remaining)")
     return ensure_clip_segment(clip)
@@ -185,8 +174,14 @@ def compute_display_window(
     lower_bound: float = 0.0,
     upper_bound: Optional[float] = None,
 ) -> tuple[float, float]:
-    """Return the full segment window (no extra padding)."""
-    # Always show the full segment range available
+    """Return the window that should be visible in the waveform.
+
+    In this app we always want to show the *full segment* and nothing else,
+    so the display window is defined by the segment range:
+    - lower_bound: segment_start_timestamp
+    - upper_bound: segment_end_timestamp
+    """
+
     display_start = lower_bound
     display_end = upper_bound if upper_bound is not None else end
     if display_end <= display_start:
@@ -213,13 +208,16 @@ def parse_relative_offsets(
 
 
 def ensure_clip_segment(clip: Optional[ClipRecord]) -> Optional[ClipRecord]:
-    """Attach stored segment metadata to ``clip`` if available."""
+    """Attach stored segment metadata to ``clip`` if available.
+
+    If segment metadata is missing or stale, synthesize a fallback segment window
+    around the clip using the original audio.
+    """
 
     if clip is None:
         return None
 
-    # When segment metadata is missing, synthesize a reasonable default window so the
-    # review UI still offers a focused playback range using the original audio file.
+    # Ensure we have a segment window
     if clip.segment_start_timestamp is None or clip.segment_end_timestamp is None:
         fallback_start, fallback_end = compute_segment_window(
             clip.start_timestamp,
@@ -241,8 +239,8 @@ def ensure_clip_segment(clip: Optional[ClipRecord]) -> Optional[ClipRecord]:
     if segment_path.exists():
         return clip
 
-    # If the stored segment path is stale, drop it so the frontend falls back to the
-    # original audio file without crashing.
+    # If the stored segment path is stale, drop it so the frontend falls back
+    # to the original audio file without crashing.
     clip.segment_path = None
     return clip
 
@@ -252,14 +250,20 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip = ensure_clip_segment(clip)
     metadata = get_audio_metadata(clip.audio_path)
+
+    # Segment offsets in the original full audio
     segment_offset = clip.segment_start_timestamp or 0.0
     segment_end = clip.segment_end_timestamp
+
+    # Display window = full segment range (segment_start -> segment_end)
     padded_start, padded_end = compute_display_window(
         clip.start_timestamp,
         clip.end_timestamp,
         lower_bound=segment_offset,
         upper_bound=segment_end,
     )
+
+    # Relative clip boundaries (in seconds inside the segment)
     if clip.relative_start_offset is not None:
         relative_clip_start = max(0.0, clip.relative_start_offset)
     else:
@@ -269,11 +273,15 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         relative_clip_end = max(relative_clip_start, clip.relative_end_offset)
     else:
         relative_clip_end = max(relative_clip_start, clip.end_timestamp - segment_offset)
+
+    # Relative display boundaries (full segment)
     relative_display_start = max(0.0, padded_start - segment_offset)
     relative_display_end = max(relative_display_start, padded_end - segment_offset)
+
     segment_duration = None
     if segment_end is not None:
         segment_duration = max(0.0, segment_end - segment_offset)
+
     audio_path_for_playback = clip.segment_path or clip.audio_path
     duration = clip.end_timestamp - clip.start_timestamp
 
@@ -449,7 +457,6 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             hx_indicator="#loading-flag",
             style="padding: 12px 18px; border-radius: 6px; background: #dc3545; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
-        # Loading indicators
         Div(
             "🔄 Loading next clip...",
             id="loading-next",
@@ -458,14 +465,14 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         ),
         Div(
             "✅ Completing review...",
-            id="loading-complete", 
+            id="loading-complete",
             cls="htmx-indicator",
             style="padding: 8px 12px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460; font-size: 14px;"
         ),
         Div(
             "🚩 Reporting issue...",
             id="loading-flag",
-            cls="htmx-indicator", 
+            cls="htmx-indicator",
             style="padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24; font-size: 14px;"
         ),
         style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;"
@@ -561,43 +568,51 @@ def render_contributor_stats() -> Div:
     """Render a panel showing contributor statistics."""
     try:
         stats = get_contributor_stats()
-        
+
         if stats["total_contributors"] == 0:
             return Div(
                 H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
-                P("Be the first to contribute! Enter your name when reviewing clips to be credited.",
-                  style="color: #6c757d; font-style: italic;"),
+                P(
+                    "Be the first to contribute! Enter your name when reviewing clips to be credited.",
+                    style="color: #6c757d; font-style: italic;"
+                ),
                 cls="contributor-stats-panel",
                 style=(
                     "margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #e9ecef; "
                     "border-radius: 8px;"
                 ),
             )
-        
-        # Show top contributors (limit to top 5)
+
         top_contributors = stats["contributors"][:5]
-        
+
         contributor_list = []
         for i, contributor in enumerate(top_contributors):
             rank_emoji = ["🥇", "🥈", "🥉", "🏅", "⭐"][i] if i < 5 else "✨"
             contributor_list.append(
                 Div(
                     Span(f"{rank_emoji} {contributor['name']}", style="font-weight: 600;"),
-                    Span(f" - {contributor['contributions']} contributions", style="color: #6c757d; margin-left: 8px;"),
+                    Span(
+                        f" - {contributor['contributions']} contributions",
+                        style="color: #6c757d; margin-left: 8px;"
+                    ),
                     style="margin-bottom: 4px;"
                 )
             )
-        
+
         return Div(
             H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
             Div(
-                P(f"Total contributors: {stats['total_contributors']} | Total contributions: {stats['total_contributions']}",
-                  style="margin-bottom: 12px; font-weight: 500; color: #495057;"),
+                P(
+                    f"Total contributors: {stats['total_contributors']} | Total contributions: {stats['total_contributions']}",
+                    style="margin-bottom: 12px; font-weight: 500; color: #495057;"
+                ),
                 *contributor_list,
                 style="margin-bottom: 8px;"
             ),
-            P("Thank you to everyone who has contributed to improving this dataset! 🎉",
-              style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"),
+            P(
+                "Thank you to everyone who has contributed to improving this dataset! 🎉",
+                style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"
+            ),
             cls="contributor-stats-panel",
             style=(
                 "margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #e9ecef; "
@@ -716,12 +731,12 @@ def index():
                 wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
                 const formatTimelineLabel = (seconds) => {
                     const relativeSeconds = clampRelativeTime(fromWaveformTime(seconds));
-                    
+
                     // For segment audio, don't show labels beyond segment duration
                     if (isSegmentAudio && !Number.isNaN(segmentDuration) && relativeSeconds > segmentDuration) {
                         return '';
                     }
-                    
+
                     if (relativeSeconds >= 100) return relativeSeconds.toFixed(0);
                     if (relativeSeconds >= 10) return relativeSeconds.toFixed(1);
                     return relativeSeconds.toFixed(2);
@@ -731,12 +746,12 @@ def index():
                     formatTimeCallback: formatTimelineLabel,
                 }));
 
-                // Construct audio URL - use full URL if config.audio_folder is a URL, otherwise use local path
+                // Build audio URL depending on whether audio_folder is local or remote
                 const audioFolder = '""" + f"{config.audio_folder}" + """';
-                const audioUrl = audioFolder.startsWith('http') 
+                const audioUrl = audioFolder.startsWith('http')
                     ? audioFolder + '/' + audioPath
                     : '/' + audioFolder + '/' + audioPath;
-                
+
                 wavesurfer.load(audioUrl);
 
                 wavesurfer.on('ready', () => {
@@ -763,9 +778,8 @@ def index():
                     });
                     updateInputsFromRegion();
 
-                    // Remove zoom logic - let WaveSurfer show the full segment naturally
-                    // Just set the initial position to the beginning
-                    wavesurfer.setTime(0);
+                    // Show the full segment, but position the playhead at the clip start
+                    wavesurfer.setTime(toWaveformTime(clipStartRelative));
                 });
 
                 const updateCurrentTime = () => {
@@ -841,7 +855,8 @@ def index():
                     stopButton.addEventListener('click', () => {
                         if (!wavesurfer) return;
                         wavesurfer.stop();
-                        wavesurfer.setTime(toWaveformTime(displayStartRelative));
+                        // After stopping, put the playhead back at the clip start inside the segment
+                        wavesurfer.setTime(toWaveformTime(clipStartRelative));
                     });
                 }
 
@@ -922,7 +937,6 @@ def next_clip(
     contributor_name: str = "",
 ):
     """Move to the next random clip without completing the current one."""
-    # Optionally save current progress before moving to next clip
     current_clip = get_clip(clip_id)
     if current_clip:
         try:
@@ -943,8 +957,7 @@ def next_clip(
                 updates['relative_start_offset'] = rel_start
                 updates['relative_end_offset'] = rel_end
             db_backend.update_clip(current_clip.id, updates)
-    
-    # Get a new random clip
+
     next_clip = select_random_clip()
     return render_main_content(next_clip)
 
@@ -1036,18 +1049,15 @@ if not AUDIO_FOLDER_IS_REMOTE:
     @rt(f"/{config.audio_folder}/{{audio_name:path}}")
     def get_audio(audio_name: str):
         """Serve audio files with security checks."""
-        # Check for path traversal attempts
         if ".." in audio_name or audio_name.startswith("/"):
             return Response("Invalid path", status_code=400)
 
-        # Validate file extension
         valid_exts = ('.webm', '.mp3', '.wav', '.ogg', '.m4a', '.flac')
         if not audio_name.lower().endswith(valid_exts):
             return Response("Invalid file type", status_code=400)
 
         audio_path = Path(config.audio_folder) / audio_name
 
-        # Ensure the resolved path is within audio directory
         try:
             audio_dir = Path(config.audio_folder).resolve()
             resolved_path = audio_path.resolve()
@@ -1062,37 +1072,6 @@ if not AUDIO_FOLDER_IS_REMOTE:
                 headers={"Cache-Control": "public, max-age=3600"}
             )
         return Response("Audio not found", status_code=404)
-
-
-def get_asgi_app():
-    """Return the FastHTML ASGI app instance for external servers."""
-
-    return app
-
-
-if modal is not None:
-    modal_app = modal.App("fast-audio-annotate")
-
-    requirements_file = ROOT_DIR / "requirements.txt"
-    image_builder = modal.Image.debian_slim(python_version="3.12")
-    if requirements_file.exists():
-        if hasattr(image_builder, "pip_install_from_requirements"):
-            modal_image = image_builder.pip_install_from_requirements(str(requirements_file))
-        else:  # Fallback for older modal clients
-            with requirements_file.open("r", encoding="utf-8") as handle:
-                packages = [line.strip() for line in handle if line.strip() and not line.startswith("#")]
-            for package in packages:
-                image_builder = image_builder.pip_install(package)
-            modal_image = image_builder
-    else:
-        modal_image = image_builder.pip_install("python-fasthtml==0.12.33")
-
-    @modal_app.function(image=modal_image)
-    @modal.asgi_app()
-    def serve():
-        """Expose the FastHTML app as an ASGI application on Modal."""
-
-        return get_asgi_app()
 
 
 # Print startup info
