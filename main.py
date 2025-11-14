@@ -280,6 +280,11 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="margin-bottom: 4px;"
         ),
         Div(
+            Strong("Playing from:"),
+            Span(f" {audio_path_for_playback}" + (" (segment)" if clip.segment_path else " (original)")),
+            style="margin-bottom: 4px; font-family: 'Courier New', monospace; font-size: 13px;"
+        ),
+        Div(
             Strong("Clip window:"),
             Span(f" {clip.start_timestamp:.2f}s – {clip.end_timestamp:.2f}s ({duration:.2f}s long)"),
             style="margin-bottom: 4px;"
