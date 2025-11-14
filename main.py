@@ -87,41 +87,39 @@ def get_audio_metadata(audio_path: Optional[str]) -> Optional[dict]:
 def render_audio_metadata_panel(metadata: Optional[dict]):
     """Render a panel summarizing audio metadata."""
 
-    if not metadata:
-        body = Div(
-            "No metadata available for this audio file.",
-            style="color: #666; font-style: italic;",
+    labels = [
+        ("year", "Año"),
+        ("show", "Show"),
+        ("festival", "Festival"),
+        ("date", "Fecha"),
+    ]
+
+    rows = []
+    if metadata:
+        for key, label in labels:
+            value = metadata.get(key)
+            if value not in (None, ""):
+                rows.append(
+                    Div(
+                        Span(label, style="font-weight: 600; min-width: 90px;"),
+                        Span(str(value), style="color: #495057;"),
+                        style="display: flex; gap: 8px; align-items: center;",
+                    )
+                )
+
+    if not rows:
+        body = P(
+            "Sin datos extra para este clip.",
+            style="color: #6c757d; font-style: italic; margin: 0;",
         )
     else:
-        entries = []
-        for key, value in sorted(metadata.items(), key=lambda item: str(item[0])):
-            if isinstance(value, (dict, list)):
-                formatted_value = json.dumps(value, ensure_ascii=False, indent=2)
-                value_node = Pre(
-                    formatted_value,
-                    style=(
-                        "margin: 0; white-space: pre-wrap; background: #f1f3f5; padding: 8px; "
-                        "border-radius: 4px; flex: 1; font-family: 'Fira Code', monospace; font-size: 13px;"
-                    ),
-                )
-            else:
-                value_node = Span(str(value))
-
-            entries.append(
-                Div(
-                    Span(f"{key}:", style="font-weight: 600; min-width: 120px;"),
-                    value_node,
-                    style="display: flex; gap: 8px; align-items: flex-start;",
-                )
-            )
-
         body = Div(
-            *entries,
-            style="display: flex; flex-direction: column; gap: 6px;"
+            *rows,
+            style="display: flex; flex-direction: column; gap: 4px;",
         )
 
     return Div(
-        H4("Audio Metadata", style="margin-bottom: 10px; color: #343a40;"),
+        H4("Detalles rápidos", style="margin-bottom: 8px; color: #343a40;"),
         body,
         cls="audio-metadata-panel",
         style=(
@@ -252,18 +250,16 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip = ensure_clip_segment(clip)
     metadata = get_audio_metadata(clip.audio_path)
-    clip_permalink = f"/clip/{clip.id}"
-
     # If there is no segment file, we cannot show the waveform for this clip.
     if not clip.segment_path:
         return Div(
-            H2("Segment not available", style="color: #dc3545; margin-bottom: 12px;"),
+            H2("No encontramos el segmento", style="color: #dc3545; margin-bottom: 12px;"),
             P(
-                f"This clip does not have a pre-generated segment file (clip id: {clip.id}).",
+                f"Este clip (ID {clip.id}) no tiene el archivo recortado listo.",
                 style="margin-bottom: 8px;"
             ),
             P(
-                "Please run the segment generation script and reload the page.",
+                "Corré el script que genera segmentos y volvé a abrir la página.",
                 style="color: #6c757d;"
             ),
             id="main-content",
@@ -305,101 +301,29 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     audio_path_for_playback = clip.segment_path
     duration = clip.end_timestamp - clip.start_timestamp
 
-    instructions = Div(
-        H3("How to review this clip", style="margin-bottom: 8px; color: #0d6efd;"),
+    intro = Div(
+        H2("Vamos a anotar este clip", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
-            "Listen carefully to the highlighted audio, correct the transcription so it matches the speech exactly, "
-            "and adjust the start/end times if they need a better cut. Use the buttons below to either save your progress, "
-            "mark the clip as reviewed, or report an issue if the audio is unusable."
+            "Escucha lo que está marcado, corregí el texto y mové los cortes si hace falta. Lo importante es dejar la "
+            "anotación lista para que otra persona la pueda usar al toque.",
+            style="color: #495057; margin-bottom: 0;",
         ),
-        style="margin-bottom: 18px; background: #f8f9fa; padding: 16px; border-radius: 8px; border: 1px solid #dee2e6;"
-    )
-
-    clip_info_entries = [
-        Div(
-            Strong("Original audio file:"),
-            Span(f" {clip.audio_path}"),
-            style="margin-bottom: 4px;"
-        ),
-        Div(
-            Strong("Playing from segment:"),
-            Span(f" {audio_path_for_playback}"),
-            style="margin-bottom: 4px; font-family: 'Courier New', monospace; font-size: 13px;"
-        ),
-        Div(
-            Strong("Clip window (absolute):"),
-            Span(f" {clip.start_timestamp:.2f}s – {clip.end_timestamp:.2f}s ({duration:.2f}s long)"),
-            style="margin-bottom: 4px;"
-        ),
-    ]
-
-    if clip.segment_start_timestamp is not None and clip.segment_end_timestamp is not None:
-        segment_context = clip.segment_end_timestamp - clip.segment_start_timestamp
-        clip_info_entries.append(
-            Div(
-                Strong("Segment window (absolute):"),
-                Span(
-                    f" {clip.segment_start_timestamp:.2f}s – {clip.segment_end_timestamp:.2f}s "
-                    f"({segment_context:.2f}s total)"
-                ),
-                style="margin-bottom: 4px;"
-            )
-        )
-
-    clip_info_entries.append(
-        Div(
-            Strong("Last updated by:"),
-            Span(f" {clip.username} at {clip.timestamp}"),
-        )
-    )
-
-    clip_info_entries.append(
-        Div(
-            Strong("Clip ID:"),
-            Span(f" {clip.id}"),
-            style="margin-bottom: 4px;",
-        )
+        style="margin-bottom: 18px; background: #f1f5ff; padding: 16px; border-radius: 10px;",
     )
 
     clip_info = Div(
-        *clip_info_entries,
-        style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;"
+        Span(f"Clip #{clip.id}", style="font-weight: 600; color: #0d6efd;"),
+        Span(f"· {duration:.1f}s"),
+        style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; color: #495057;",
     )
 
-    share_controls = Div(
-        Label("Share this clip", style="display: block; margin-bottom: 6px; font-weight: 600;"),
-        Div(
-            Input(
-                type="text",
-                id="share-link-input",
-                readonly=True,
-                value=clip_permalink,
-                style="flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px;",
-            ),
-            Button(
-                "Copy link",
-                type="button",
-                id="copy-share-link",
-                style=(
-                    "margin-left: 8px; padding: 10px 16px; border-radius: 6px; background: #6610f2; color: white; "
-                    "border: none; font-size: 14px; cursor: pointer;"
-                ),
-            ),
-            style="display: flex; align-items: center;",
-        ),
-        Div(
-            "Anyone with this link can open the clip directly in the editor.",
-            style="font-size: 12px; color: #6c757d; margin-top: 4px; font-style: italic;",
-        ),
-        style="margin-bottom: 16px;",
-    )
 
     form_inputs = Div(
         Input(type="hidden", name="clip_id", value=str(clip.id)),
         Div(
             Div(
                 Label(
-                    "Start within segment (seconds)",
+                    "Inicio dentro del segmento (segundos)",
                     style="display: block; margin-bottom: 4px; font-weight: 600;",
                 ),
                 Input(
@@ -425,7 +349,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             ),
             Div(
                 Label(
-                    "End within segment (seconds)",
+                    "Fin dentro del segmento (segundos)",
                     style="display: block; margin-bottom: 4px; font-weight: 600;",
                 ),
                 Input(
@@ -452,28 +376,28 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;"
         ),
         Div(
-            Label("Transcription", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px;"),
+            Label("Texto", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px;"),
             Textarea(
                 clip.text or "",
                 name="transcription",
                 id="transcription-input",
                 rows="6",
-                placeholder="Type the corrected transcription here...",
+                placeholder="Escribí acá lo que se escucha, sin adornos ni faltas.",
                 style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; resize: vertical;",
             ),
             style="margin-bottom: 16px;"
         ),
         Div(
-            Label("Your name (optional)", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px; color: #495057;"),
+            Label("Tu nombre (opcional)", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px; color: #495057;"),
             Input(
                 value=clip.username if hasattr(clip, 'username') and clip.username and clip.username != 'unknown' else "",
                 name="contributor_name",
                 id="contributor-name-input",
-                placeholder="Enter your name to be credited as a contributor...",
+                placeholder="Poné cómo querés aparecer en el ranking...",
                 style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px;",
             ),
             Div(
-                "💡 Your name will be used to credit your contributions to this project!",
+                "💡 Así te podemos agradecer y sumar tus aportes.",
                 style="font-size: 12px; color: #6c757d; margin-top: 4px; font-style: italic;"
             ),
             style="margin-bottom: 20px;"
@@ -483,7 +407,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     actions = Div(
         Button(
-            "➡️ Next clip",
+            "➡️ Siguiente clip",
             cls="next-btn",
             hx_post="/next_clip",
             hx_include="#clip-form input, #clip-form textarea",
@@ -493,7 +417,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="padding: 12px 18px; border-radius: 6px; background: #ffc107; color: #000; border: none; font-size: 15px; cursor: pointer;"
         ),
         Button(
-            "✅ Finish review",
+            "💾 Guardar anotación",
             cls="complete-btn",
             hx_post="/complete_clip",
             hx_include="#clip-form input, #clip-form textarea",
@@ -503,30 +427,30 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="padding: 12px 18px; border-radius: 6px; background: #0d6efd; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
         Button(
-            "🚩 Report issue",
+            "🚩 Marcar clip",
             cls="flag-btn",
             hx_post="/flag_clip",
             hx_include="#clip-form input, #clip-form textarea",
-            hx_confirm="Report this clip as problematic?",
+            hx_confirm="¿Marcamos este clip para revisarlo después?",
             hx_target="#main-content",
             hx_swap="outerHTML",
             hx_indicator="#loading-flag",
             style="padding: 12px 18px; border-radius: 6px; background: #dc3545; color: white; border: none; font-size: 15px; cursor: pointer;"
         ),
         Div(
-            "🔄 Loading next clip...",
+            "🔄 Cargando otro clip...",
             id="loading-next",
             cls="htmx-indicator",
             style="padding: 8px 12px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404; font-size: 14px;"
         ),
         Div(
-            "✅ Completing review...",
+            "✅ Guardando...",
             id="loading-complete",
             cls="htmx-indicator",
             style="padding: 8px 12px; background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460; font-size: 14px;"
         ),
         Div(
-            "🚩 Reporting issue...",
+            "🚩 Marcando...",
             id="loading-flag",
             cls="htmx-indicator",
             style="padding: 8px 12px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24; font-size: 14px;"
@@ -537,19 +461,19 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     waveform = Div(
         Div(
             Div(
-                "Current Time: ",
+                "Tiempo actual: ",
                 Span("0.00", id="current-time", style="font-weight: bold; color: #0d6efd;"),
                 " s",
                 style="font-size: 16px; margin-bottom: 12px;"
             ),
             Div(
-                "Hotkeys: [",
+                "Atajos: [",
                 Span("Q", style="font-weight: 600; color: #198754;"),
-                "] start • [",
+                "] inicio • [",
                 Span("W", style="font-weight: 600; color: #dc3545;"),
-                "] end • [",
-                Span("Space", style="font-weight: 600; color: #0d6efd;"),
-                "] play/pause",
+                "] fin • [",
+                Span("Espacio", style="font-weight: 600; color: #0d6efd;"),
+                "] reproducir/pausa",
                 style="color: #6c757d; font-size: 14px;"
             ),
             style="margin-bottom: 16px;"
@@ -557,10 +481,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         Div(id="waveform", style="width: 100%; height: 140px; background: #f1f3f5; border-radius: 8px; margin-bottom: 12px;"),
         Div(id="timeline", style="width: 100%; margin-bottom: 16px;"),
         Div(
-            Button("▶ Play", id="play-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Button("⏸ Pause", id="pause-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Button("⏹ Stop", id="stop-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Label("Speed:", style="margin-left: 12px; font-weight: 600;"),
+            Button("▶ Reproducir", id="play-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            Button("⏸ Pausa", id="pause-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            Button("⏹ Volver", id="stop-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            Label("Velocidad:", style="margin-left: 12px; font-weight: 600;"),
             Select(
                 Option("0.75x", value="0.75"),
                 Option("1x", value="1", selected=True),
@@ -578,9 +502,8 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     metadata_panel = render_audio_metadata_panel(metadata)
 
     return Div(
-        instructions,
+        intro,
         clip_info,
-        share_controls,
         waveform,
         form_inputs,
         actions,
@@ -606,9 +529,9 @@ def render_empty_state() -> Div:
     """Render a friendly message when no clips are available."""
 
     return Div(
-        H2("All caught up!", style="text-align: center; color: #198754;"),
+        H2("No hay más clips por ahora", style="text-align: center; color: #198754;"),
         P(
-            "There are no clips waiting for human review right now. Please check back later.",
+            "Apenas haya nuevo material para anotar lo vas a ver acá. Gracias por darte una vuelta.",
             style="text-align: center; font-size: 16px; color: #6c757d;"
         ),
         id="main-content",
@@ -623,6 +546,88 @@ def render_main_content(clip: Optional[ClipRecord]) -> Div:
     return render_empty_state()
 
 
+def render_tab_shell(
+    active_tab: str,
+    clip: Optional[ClipRecord],
+    status_message: Optional[str] = None,
+) -> Div:
+    """Render the tab navigation plus whichever panel is active."""
+
+    clip_id_value = str(clip.id) if clip else ""
+
+    def tab_button_style(is_active: bool) -> str:
+        base = "padding: 10px 18px; border-radius: 999px; border: none; font-weight: 600; cursor: pointer;"
+        colors = " background: #0d6efd; color: #ffffff;" if is_active else " background: #e9ecef; color: #495057;"
+        return base + colors
+
+    annotate_button = Button(
+        "Anotar",
+        type="button",
+        cls=f"tab-button{' active' if active_tab == 'anotar' else ''}",
+        hx_get=f"/tab/anotar?clip_id={clip_id_value}",
+        hx_target="#tab-shell",
+        hx_swap="outerHTML",
+        hx_indicator="#tab-loading",
+        style=tab_button_style(active_tab == "anotar"),
+    )
+
+    ranking_button = Button(
+        "Ranking",
+        type="button",
+        cls=f"tab-button{' active' if active_tab == 'ranking' else ''}",
+        hx_get=f"/tab/ranking?clip_id={clip_id_value}",
+        hx_target="#tab-shell",
+        hx_swap="outerHTML",
+        hx_indicator="#tab-loading",
+        style=tab_button_style(active_tab == "ranking"),
+    )
+
+    indicator = Div(
+        "🔄 Cambiando de pestaña...",
+        id="tab-loading",
+        cls="htmx-indicator",
+        style="padding: 8px 12px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #664d03; font-size: 14px;",
+    )
+
+    status_box = None
+    if status_message:
+        status_box = Div(
+            status_message,
+            role="status",
+            style=(
+                "margin-bottom: 16px; padding: 12px; border-radius: 8px; background: #fff3cd; "
+                "border: 1px solid #ffeaa7; color: #664d03;"
+            ),
+        )
+
+    if active_tab == "ranking":
+        tab_content = Div(
+            H2("Ranking de quienes están dando una mano", style="margin-bottom: 12px; color: #0d6efd;"),
+            P(
+                "Los nombres aparecen si dejás el tuyo al enviar una anotación.",
+                style="color: #6c757d; margin-bottom: 16px;",
+            ),
+            render_contributor_stats(),
+            style="margin-bottom: 20px;",
+        )
+    else:
+        tab_content = render_main_content(clip)
+
+    body_children = [child for child in (status_box, tab_content) if child is not None]
+
+    return Div(
+        Div(
+            annotate_button,
+            ranking_button,
+            indicator,
+            cls="tab-nav",
+            style="display: flex; gap: 8px; margin-bottom: 20px; align-items: center;",
+        ),
+        *body_children,
+        id="tab-shell",
+    )
+
+
 def render_contributor_stats() -> Div:
     """Render a panel showing contributor statistics."""
     try:
@@ -630,9 +635,9 @@ def render_contributor_stats() -> Div:
 
         if stats["total_contributors"] == 0:
             return Div(
-                H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
+                H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
                 P(
-                    "Be the first to contribute! Enter your name when reviewing clips to be credited.",
+                    "Todavía no hay nombres en la lista. Dejá el tuyo cuando mandes una anotación y aparecés acá.",
                     style="color: #6c757d; font-style: italic;"
                 ),
                 cls="contributor-stats-panel",
@@ -651,7 +656,7 @@ def render_contributor_stats() -> Div:
                 Div(
                     Span(f"{rank_emoji} {contributor['name']}", style="font-weight: 600;"),
                     Span(
-                        f" - {contributor['contributions']} contributions",
+                        f" - {contributor['contributions']} aportes",
                         style="color: #6c757d; margin-left: 8px;"
                     ),
                     style="margin-bottom: 4px;"
@@ -659,17 +664,17 @@ def render_contributor_stats() -> Div:
             )
 
         return Div(
-            H4("🙏 Contributors", style="margin-bottom: 10px; color: #343a40;"),
+            H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
             Div(
                 P(
-                    f"Total contributors: {stats['total_contributors']} | Total contributions: {stats['total_contributions']}",
+                    f"Personas que ayudaron: {stats['total_contributors']} · Anotaciones enviadas: {stats['total_contributions']}",
                     style="margin-bottom: 12px; font-weight: 500; color: #495057;"
                 ),
                 *contributor_list,
                 style="margin-bottom: 8px;"
             ),
             P(
-                "Thank you to everyone who has contributed to improving this dataset! 🎉",
+                "Gracias por darle amor a este dataset. 💚",
                 style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"
             ),
             cls="contributor-stats-panel",
@@ -955,16 +960,12 @@ APP_SCRIPT = Script("""
         });
     }
 
-    function syncClipLink() {
+    function syncClipRoute() {
         const mainContent = document.getElementById('main-content');
         if (!mainContent) {
             return;
         }
         const clipId = mainContent.dataset.clipId;
-        const shareInput = document.getElementById('share-link-input');
-        const copyButton = document.getElementById('copy-share-link');
-        const baseUrl = window.location.origin;
-        const shareUrl = clipId ? `${baseUrl}/clip/${clipId}` : `${baseUrl}/`;
 
         if (clipId) {
             const newPath = `/clip/${clipId}`;
@@ -974,39 +975,16 @@ APP_SCRIPT = Script("""
         } else if (window.location.pathname !== '/') {
             window.history.replaceState({}, '', '/');
         }
-
-        if (shareInput) {
-            shareInput.value = shareUrl;
-        }
-
-        if (copyButton) {
-            copyButton.onclick = () => {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(shareUrl)
-                        .then(() => {
-                            copyButton.textContent = 'Link copied!';
-                            setTimeout(() => (copyButton.textContent = 'Copy link'), 2000);
-                        })
-                        .catch(() => {
-                            copyButton.textContent = 'Copy failed';
-                            setTimeout(() => (copyButton.textContent = 'Copy link'), 2000);
-                        });
-                } else if (shareInput) {
-                    shareInput.select();
-                    document.execCommand('copy');
-                }
-            };
-        }
     }
 
     function handleClipLoaded() {
         initWaveSurfer();
-        syncClipLink();
+        syncClipRoute();
     }
 
     document.addEventListener('DOMContentLoaded', handleClipLoaded);
     document.body.addEventListener('htmx:afterSwap', (event) => {
-        if (event.target.id === 'main-content') {
+        if (event.target.id === 'main-content' || (event.target.querySelector && event.target.querySelector('#main-content'))) {
             handleClipLoaded();
         }
     });
@@ -1015,27 +993,16 @@ APP_SCRIPT = Script("""
 def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = None) -> Titled:
     """Render the full application shell for the given clip."""
 
-    main_content = render_main_content(clip)
-    contributor_stats = render_contributor_stats()
+    tab_shell = render_tab_shell("anotar", clip, status_message)
 
     body_children = [
-        H1("Clip review"),
-        contributor_stats,
+        H1("Anotador de clips", style="margin-bottom: 8px;"),
+        P(
+            "Solo las herramientas esenciales para corregir timestamps y texto. Fácil, rápido y en español.",
+            style="margin-bottom: 20px; color: #6c757d;"
+        ),
+        tab_shell,
     ]
-
-    if status_message:
-        body_children.append(
-            Div(
-                status_message,
-                role="status",
-                style=(
-                    "margin-bottom: 16px; padding: 12px; border-radius: 8px; background: #fff3cd; "
-                    "border: 1px solid #ffeaa7; color: #664d03;"
-                ),
-            )
-        )
-
-    body_children.append(main_content)
 
     return Titled(
         config.title,
@@ -1045,6 +1012,7 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
         ),
         APP_SCRIPT,
     )
+
 
 
 # Routes
@@ -1061,9 +1029,24 @@ def clip_detail(clip_id: int):
     clip = get_clip(str(clip_id))
     status_message = None
     if clip is None:
-        status_message = f"Clip {clip_id} is not available. Showing another clip instead."
+        status_message = f"El clip {clip_id} no está disponible. Te mostramos otro para que sigas."
         clip = select_random_clip()
     return render_app_page(clip, status_message=status_message)
+
+
+@rt("/tab/{tab_name}")
+def switch_tab(tab_name: str, clip_id: str = "", status_message: str = ""):
+    """Render the requested tab via htmx."""
+
+    normalized_tab = tab_name.lower()
+    if normalized_tab not in {"anotar", "ranking"}:
+        normalized_tab = "anotar"
+
+    clip = get_clip(clip_id) if clip_id else None
+    if normalized_tab == "anotar" and clip is None:
+        clip = select_random_clip()
+
+    return render_tab_shell(normalized_tab, clip, status_message or None)
 
 
 @rt("/next_clip", methods=["POST"])
