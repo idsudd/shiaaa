@@ -43,7 +43,7 @@ load_audio_metadata_from_file(config.audio_path, db_backend, config.metadata_fil
 
 # Runtime helpers for audio segments
 # Segment constants
-SEGMENT_PADDING_SECONDS = 5.0
+SEGMENT_PADDING_SECONDS = 2.0
 SEGMENT_SUBDIR_NAME = "segments"
 AUDIO_FOLDER_IS_REMOTE = config.audio_folder.startswith(("http://", "https://"))
 
