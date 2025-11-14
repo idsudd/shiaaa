@@ -8,10 +8,11 @@ Fast Audio Annotate is a lightweight FastHTML interface built for collective aud
 
 1. **Prepare your audio**: drop files into the configured folder (default: `audio/`) and, if needed, add a `metadata.json` with extra context.
 2. **Run it locally**: install dependencies with `pip install -r requirements.txt` and launch `python main.py` to serve the app at `http://localhost:5001`.
-3. **Draft with Whisper**: use the included scripts to generate initial transcriptions before asking the community for help.
+3. **Draft with Whisper & segments**: use the included scripts (for example `segments_audios.py`) to generate initial transcriptions and pre-split your audio into timestamped segments that keep their original timing.
 4. **Deploy and share**: deploy the app using your preferred platform (see [deployment options](https://github.com/AnswerDotAI/fh-deploy)) and share the link so your collaborators can correct and approve clips from anywhere.
 
-The tool keeps track of every contribution, renders waveforms with WaveSurfer.js, and focuses on being simple so anyone can jump in and improve the transcripts.
+The tool keeps track of every contribution, renders waveforms with WaveSurfer.js, and focuses on being simple so anyone can jump in and improve the transcripts. In a typical setup, `segments_audios.py` is used once to populate the database with short, machine-transcribed audio segments, and the web UI is then used by the community to correct both the text and the segment boundaries.
+
 
 ## Installation
 
