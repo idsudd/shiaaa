@@ -7,8 +7,6 @@ import os
 import sys
 import json
 from datetime import datetime
-
-
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file if present
 
@@ -212,6 +210,10 @@ def ensure_clip_segment(clip: Optional[ClipRecord]) -> Optional[ClipRecord]:
 
     If segment metadata is missing or stale, synthesize a fallback segment window
     around the clip using the original audio.
+
+    Note: the UI will *only* play the segment file when available. If the
+    segment file is missing, we still keep the timestamps (for alignment),
+    but we do not fall back to playing the full routine.
     """
 
     if clip is None:
@@ -232,6 +234,7 @@ def ensure_clip_segment(clip: Optional[ClipRecord]) -> Optional[ClipRecord]:
         return clip
 
     if AUDIO_FOLDER_IS_REMOTE:
+        # We cannot reliably check existence for remote storage; trust the path.
         return clip
 
     audio_root = config.audio_path
@@ -239,8 +242,7 @@ def ensure_clip_segment(clip: Optional[ClipRecord]) -> Optional[ClipRecord]:
     if segment_path.exists():
         return clip
 
-    # If the stored segment path is stale, drop it so the frontend falls back
-    # to the original audio file without crashing.
+    # If the stored segment path is stale, drop it.
     clip.segment_path = None
     return clip
 
@@ -250,6 +252,22 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip = ensure_clip_segment(clip)
     metadata = get_audio_metadata(clip.audio_path)
+
+    # If there is no segment file, we cannot show the waveform for this clip.
+    if not clip.segment_path:
+        return Div(
+            H2("Segment not available", style="color: #dc3545; margin-bottom: 12px;"),
+            P(
+                f"This clip does not have a pre-generated segment file (clip id: {clip.id}).",
+                style="margin-bottom: 8px;"
+            ),
+            P(
+                "Please run the segment generation script and reload the page.",
+                style="color: #6c757d;"
+            ),
+            id="main-content",
+            style="max-width: 640px; margin: 40px auto; background: white; padding: 24px; border-radius: 10px; border: 1px solid #f1f3f5;"
+        )
 
     # Segment offsets in the original full audio
     segment_offset = clip.segment_start_timestamp or 0.0
@@ -282,7 +300,8 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     if segment_end is not None:
         segment_duration = max(0.0, segment_end - segment_offset)
 
-    audio_path_for_playback = clip.segment_path or clip.audio_path
+    # IMPORTANT: always play the pre-generated segment, never the full routine.
+    audio_path_for_playback = clip.segment_path
     duration = clip.end_timestamp - clip.start_timestamp
 
     instructions = Div(
@@ -297,17 +316,17 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip_info_entries = [
         Div(
-            Strong("Audio file:"),
+            Strong("Original audio file:"),
             Span(f" {clip.audio_path}"),
             style="margin-bottom: 4px;"
         ),
         Div(
-            Strong("Playing from:"),
-            Span(f" {audio_path_for_playback}" + (" (segment)" if clip.segment_path else " (original)")),
+            Strong("Playing from segment:"),
+            Span(f" {audio_path_for_playback}"),
             style="margin-bottom: 4px; font-family: 'Courier New', monospace; font-size: 13px;"
         ),
         Div(
-            Strong("Clip window:"),
+            Strong("Clip window (absolute):"),
             Span(f" {clip.start_timestamp:.2f}s – {clip.end_timestamp:.2f}s ({duration:.2f}s long)"),
             style="margin-bottom: 4px;"
         ),
@@ -317,7 +336,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         segment_context = clip.segment_end_timestamp - clip.segment_start_timestamp
         clip_info_entries.append(
             Div(
-                Strong("Segment window:"),
+                Strong("Segment window (absolute):"),
                 Span(
                     f" {clip.segment_start_timestamp:.2f}s – {clip.segment_end_timestamp:.2f}s "
                     f"({segment_context:.2f}s total)"
@@ -539,7 +558,8 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         data_segment_duration=(
             f"{segment_duration:.2f}" if segment_duration is not None else ""
         ),
-        data_is_segment_audio=("1" if clip.segment_path else "0"),
+        # Mark that we are ALWAYS using a segment audio file here
+        data_is_segment_audio="1",
     )
 
 
@@ -663,7 +683,7 @@ def index():
                 const clipEndAbsolute = parseFloat(mainContent.dataset.clipEnd || '0');
                 const displayStartAbsolute = parseFloat(mainContent.dataset.displayStart || clipStartAbsolute);
                 const displayEndAbsolute = parseFloat(mainContent.dataset.displayEnd || clipEndAbsolute);
-                const isSegmentAudio = mainContent.dataset.isSegmentAudio === '1';
+                const isSegmentAudio = true; // we always play the segment audio now
 
                 const clipStartRelative = Math.max(0, clipStartAbsolute - segmentOffset);
                 const clipEndRelative = Math.max(clipStartRelative, clipEndAbsolute - segmentOffset);
@@ -696,13 +716,14 @@ def index():
                 };
 
                 const toWaveformTime = (relativeValue) => {
+                    // Segment audio: waveform timeline is 0..segmentDuration
                     if (!Number.isFinite(relativeValue)) return relativeValue;
-                    return isSegmentAudio ? relativeValue : segmentOffset + relativeValue;
+                    return relativeValue;
                 };
 
                 const fromWaveformTime = (waveformValue) => {
                     if (!Number.isFinite(waveformValue)) return waveformValue;
-                    return isSegmentAudio ? waveformValue : waveformValue - segmentOffset;
+                    return waveformValue;
                 };
 
                 const updateInputsFromRegion = () => {
@@ -732,8 +753,7 @@ def index():
                 const formatTimelineLabel = (seconds) => {
                     const relativeSeconds = clampRelativeTime(fromWaveformTime(seconds));
 
-                    // For segment audio, don't show labels beyond segment duration
-                    if (isSegmentAudio && !Number.isNaN(segmentDuration) && relativeSeconds > segmentDuration) {
+                    if (!Number.isNaN(segmentDuration) && relativeSeconds > segmentDuration) {
                         return '';
                     }
 
@@ -1072,6 +1092,7 @@ if not AUDIO_FOLDER_IS_REMOTE:
                 headers={"Cache-Control": "public, max-age=3600"}
             )
         return Response("Audio not found", status_code=404)
+
 
 
 # Print startup info
