@@ -88,10 +88,9 @@ def render_audio_metadata_panel(metadata: Optional[dict]):
     """Render a panel summarizing audio metadata."""
 
     labels = [
-        ("year", "Año"),
-        ("show", "Show"),
-        ("festival", "Festival"),
         ("date", "Fecha"),
+        ("event", "Show"),
+        ("artista", "Artista"),
     ]
 
     rows = []
