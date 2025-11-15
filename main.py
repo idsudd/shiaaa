@@ -261,7 +261,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         H2("Vamos a transcribir este audio en español chileno", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
             "Ayúdanos a construir una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de código abierto que sí entienda cómo hablamos los chilenos.",
+            "para poder entrenar un modelo de código abierto que si pueda entender cómo hablamos los chilenos.",
             style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
         ),
         P(
