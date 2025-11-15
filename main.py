@@ -270,10 +270,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     if metadata:
         artist = metadata.get("artist")
         event = metadata.get("event")
-        date = metadata.get("date")
-        if artist and event and date:
+        year = metadata.get("year")
+        if artist and event and year:
             metadata_line = P(
-                f"Audio extraído del show de {artist}, el {date} en el {event}",
+                f"Audio extraído del show de {artist}, en el {event} de {year}",
                 style="margin: 4px 0 0; color: #6c757d;",
             )
 
@@ -609,7 +609,7 @@ def render_contributor_stats() -> Div:
             return Div(
                 H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
                 P(
-                    "Todavía no hay nombres en la lista. Dejá el tuyo cuando mandes una anotación y aparecés acá.",
+                    "Todavía no hay nombres en la lista. Dejá el tuyo cuando mandes una anotación y aparecerás acá.",
                     style="color: #6c757d; font-style: italic;"
                 ),
                 cls="contributor-stats-panel",
