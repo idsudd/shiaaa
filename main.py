@@ -585,6 +585,18 @@ def render_about_panel() -> Div:
                 style="color: #0d6efd; font-weight: 600;"
             ),
             ".",
+            style="color: #495057; margin-bottom: 12px;"
+        ),
+        P(
+            "El código de esta herramienta está disponible en ",
+            A(
+                "GitHub",
+                href="https://github.com/idsudd/shiaaa",
+                target="_blank",
+                rel="noopener",
+                style="color: #0d6efd; font-weight: 600;"
+            ),
+            ".",
             style="color: #495057; margin-bottom: 0;"
         ),
         style="margin-bottom: 20px; padding: 20px; border-radius: 12px; background: #f8f9fa;"
