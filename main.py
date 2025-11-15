@@ -759,7 +759,7 @@ def render_contributor_stats() -> Div:
                 style="margin-bottom: 8px;"
             ),
             P(
-                "Gracias por darle amor a este dataset. 💚",
+                "Gracias por la ayuda inmensa 💚. ",
                 style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"
             ),
             cls="contributor-stats-panel",
