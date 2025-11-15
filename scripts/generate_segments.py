@@ -21,6 +21,7 @@ from pathlib import Path
 import sys
 import textwrap
 from typing import Iterable, Optional, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import yaml
 from dotenv import load_dotenv
@@ -106,6 +107,12 @@ def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
             "matches this value will be processed (e.g. 'routine_60.webm')."
         ),
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=os.cpu_count() or 4,
+        help="Número de hilos en paralelo para generar segmentos (default: núm. de CPUs).",
+    )
     return parser.parse_args(argv)
 
 
@@ -134,6 +141,8 @@ def collect_jobs(
 
     If `audio_path_filter` is provided, only clips with that audio_path are fetched.
     Otherwise, all clips in the database are considered.
+
+    Además, solo se procesan clips cuyo archivo de audio termine en .webm.
     """
 
     if audio_path_filter:
@@ -145,17 +154,47 @@ def collect_jobs(
 
     for clip in clips:
         source_path = audio_root / clip.audio_path
+
+        # 🔥 Solo procesar archivos .webm
+        if source_path.suffix.lower() != ".webm":
+            continue
+
         if not source_path.exists():
             print(f"⚠️  Skipping clip {clip.id}: audio source missing ({source_path}).")
             continue
+
         jobs.append(SegmentJob(clip=clip, source_path=source_path))
 
     if audio_path_filter:
-        print(f"🎯 Collected {len(jobs)} clips for audio_path='{audio_path_filter}'")
+        print(f"🎯 Collected {len(jobs)} .webm clips for audio_path='{audio_path_filter}'")
     else:
-        print(f"🎯 Collected {len(jobs)} clips across all audio files")
+        print(f"🎯 Collected {len(jobs)} .webm clips across all audio files")
 
     return jobs
+
+
+def process_clip_segment(
+    clip: ClipRecord,
+    source_path: Path,
+    audio_root: Path,
+    segment_subdir: str,
+    padding: float,
+    ffmpeg_binary: str,
+) -> SegmentGenerationResult:
+    """
+    Función que corre en un hilo: solo se encarga de llamar a generate_segment.
+    No toca la base de datos.
+    """
+    return generate_segment(
+        clip_id=clip.id,
+        audio_root=audio_root,
+        source_path=source_path,
+        segment_dir_name=segment_subdir,
+        clip_start=clip.start_timestamp,
+        clip_end=clip.end_timestamp,
+        padding=padding,
+        ffmpeg_binary=ffmpeg_binary,
+    )
 
 
 def run(argv: Optional[Iterable[str]] = None) -> int:
@@ -205,11 +244,14 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
     skipped = 0
     failures = 0
 
+    # 1) Filtramos qué trabajos realmente necesitan generarse
+    pending_jobs: List[SegmentJob] = []
+
     for job in jobs:
         clip = job.clip
         existing_path = clip.segment_path
 
-        # If a segment already exists and --force is not used, reuse it
+        # Reutilizar segmento existente si es válido y no hay --force
         if (
             not args.force
             and existing_path
@@ -220,6 +262,7 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
             skipped += 1
             continue
 
+        # Sólo mostramos lo que haríamos en modo dry-run
         if args.dry_run:
             print(
                 f"[DRY RUN] Would generate segment for clip {clip.id} "
@@ -228,33 +271,66 @@ def run(argv: Optional[Iterable[str]] = None) -> int:
             skipped += 1
             continue
 
-        # If we are forcing regeneration, remove previous segment file (if any)
-        remove_previous_segment(audio_root, existing_path if args.force else None)
+        # Si forzamos, borramos el segmento previo (si lo hay)
+        if args.force and existing_path:
+            remove_previous_segment(audio_root, existing_path)
 
-        try:
-            result: SegmentGenerationResult = generate_segment(
-                clip_id=clip.id,
-                audio_root=audio_root,
-                source_path=job.source_path,
-                segment_dir_name=args.segment_subdir,
-                clip_start=clip.start_timestamp,
-                clip_end=clip.end_timestamp,
-                padding=args.padding,
-                ffmpeg_binary=ffmpeg_binary,
-            )
-        except SegmentGenerationError as exc:
-            print(f"❌ Failed to generate segment for clip {clip.id}: {exc}")
-            failures += 1
-            continue
+        pending_jobs.append(job)
 
-        # Persist mapping from clip -> segment in the database
-        db_backend.upsert_clip_segment(
-            clip.id,
-            result.relative_path,
-            result.start_timestamp,
-            result.end_timestamp,
+    if args.dry_run:
+        # Ya hemos impreso todo en el bucle anterior
+        print(
+            f"[DRY RUN] Total clips: {len(jobs)}, "
+            f"{skipped} reutilizados/omitidos, {len(pending_jobs)} que se generarían."
         )
-        generated += 1
+        return 0
+
+    if not pending_jobs:
+        print(
+            f"Processed {len(jobs)} clips: 0 generated, {skipped} reused/skipped, 0 failed."
+        )
+        return 0
+
+    # 2) Paralelizamos solo la generación de segmentos
+    max_workers = max(1, args.workers)
+    print(f"🚀 Generating {len(pending_jobs)} segments with {max_workers} worker(s)...")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_clip = {
+            executor.submit(
+                process_clip_segment,
+                job.clip,
+                job.source_path,
+                audio_root,
+                args.segment_subdir,
+                args.padding,
+                ffmpeg_binary,
+            ): job.clip
+            for job in pending_jobs
+        }
+
+        for future in as_completed(future_to_clip):
+            clip = future_to_clip[future]
+            try:
+                result: SegmentGenerationResult = future.result()
+            except SegmentGenerationError as exc:
+                print(f"❌ Failed to generate segment for clip {clip.id}: {exc}")
+                failures += 1
+                continue
+            except Exception as exc:
+                # Por si acaso algo más raro explota
+                print(f"💥 Unexpected error for clip {clip.id}: {exc}")
+                failures += 1
+                continue
+
+            # 3) Guardamos el resultado en la base de datos (solo en el hilo principal)
+            db_backend.upsert_clip_segment(
+                clip.id,
+                result.relative_path,
+                result.start_timestamp,
+                result.end_timestamp,
+            )
+            generated += 1
 
     total = len(jobs)
     print(

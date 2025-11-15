@@ -86,24 +86,23 @@ def get_audio_metadata(audio_path: Optional[str]) -> Optional[dict]:
 
 
 def select_random_clip() -> Optional[ClipRecord]:
-    """Pick a random clip that still needs human review - currently filtered to routine_60.webm only."""
+    """Pick a random clip that still needs human review."""
     import random
 
     all_clips = db_backend.fetch_all_clips()
 
-    routine_60_clips = [
+    unreviewed_clips = [
         clip for clip in all_clips
-        if clip.audio_path == "routine_60.webm"
-        and not clip.human_reviewed
+        if not clip.human_reviewed
         and not clip.marked
     ]
 
-    if not routine_60_clips:
-        print("🎯 No more routine_60.webm clips need review")
+    if not unreviewed_clips:
+        print("🎯 No more clips need review")
         return None
 
-    clip = random.choice(routine_60_clips)
-    print(f"🎯 Selected clip {clip.id} from routine_60.webm ({len(routine_60_clips)} clips remaining)")
+    clip = random.choice(unreviewed_clips)
+    print(f"🎯 Selected clip {clip.id} from {clip.audio_path} ({len(unreviewed_clips)} clips remaining)")
     return ensure_clip_segment(clip)
 
 
