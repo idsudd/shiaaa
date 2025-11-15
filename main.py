@@ -1056,7 +1056,7 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
     tab_shell = render_tab_shell("anotar", clip, status_message)
 
     footer = Div(
-        "Una iniciativa del ",
+        "Una iniciativa originada en el ",
         A(
             "Instituto de Data Science UDD",
             href="https://github.com/idsudd",
