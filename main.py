@@ -86,23 +86,38 @@ def get_audio_metadata(audio_path: Optional[str]) -> Optional[dict]:
 
 
 def select_random_clip() -> Optional[ClipRecord]:
-    """Pick a random clip that still needs human review."""
+    """Pick a random clip that still needs human review and has segment file available."""
     import random
 
     all_clips = db_backend.fetch_all_clips()
 
-    unreviewed_clips = [
+    def has_valid_segment(clip: ClipRecord) -> bool:
+        """Check if clip has a valid segment file available."""
+        if not clip.segment_path:
+            return False
+        
+        if AUDIO_FOLDER_IS_REMOTE:
+            # For remote storage, trust that the path exists if it's set
+            return True
+        
+        # For local storage, check if file actually exists
+        audio_root = config.audio_path
+        segment_path = audio_root / clip.segment_path
+        return segment_path.exists()
+
+    unreviewed_clips_with_segments = [
         clip for clip in all_clips
         if not clip.human_reviewed
         and not clip.marked
+        and has_valid_segment(clip)
     ]
 
-    if not unreviewed_clips:
-        print("🎯 No more clips need review")
+    if not unreviewed_clips_with_segments:
+        print("🎯 No more clips with segments need review")
         return None
 
-    clip = random.choice(unreviewed_clips)
-    print(f"🎯 Selected clip {clip.id} from {clip.audio_path} ({len(unreviewed_clips)} clips remaining)")
+    clip = random.choice(unreviewed_clips_with_segments)
+    print(f"🎯 Selected clip {clip.id} from {clip.audio_path} ({len(unreviewed_clips_with_segments)} clips with segments remaining)")
     return ensure_clip_segment(clip)
 
 
