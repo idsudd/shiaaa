@@ -215,7 +215,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 style="margin-bottom: 8px;"
             ),
             P(
-                "Corré el script que genera segmentos y volvé a abrir la página.",
+                "Espera un rato y abre la página nuevamente más tarde.",
                 style="color: #6c757d;"
             ),
             id="main-content",
@@ -260,8 +260,21 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     intro = Div(
         H2("Vamos a anotar este clip", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
-            "Escucha el audio, corrige el texto y ajusta los cortes de tiempo si es necesario.",
-            style="color: #495057; margin-bottom: 0;",
+            "Ayúdanos a construir una base de datos de transcripciones de audio en español chileno "
+            "para poder entrenar un modelo de código abierto que sí entienda cómo hablamos los chilenos.",
+            style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
+        ),
+        P(
+            Strong("¿Qué tienes que hacer? "),
+            "Primero, ",
+            Strong("escucha el audio completo"),
+            ". Después ",
+            Strong("corrige el texto"),
+            " si tiene errores y ",
+            Strong("ajusta los tiempos de inicio y fin del clip"),
+            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan "
+            "y mantén la forma natural de hablar de las personas del audio.",
+            style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
         style="margin-bottom: 18px; background: #f1f5ff; padding: 16px; border-radius: 10px;",
     )
@@ -273,7 +286,12 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         year = metadata.get("year")
         if artist and event and year:
             metadata_line = P(
-                f"Audio extraído del show de {artist}, en el {event} de {year}",
+                "Audio extraído del show de ",
+                Strong(str(artist)),
+                ", en el ",
+                Strong(str(event)),
+                " de ",
+                Strong(str(year)),
                 style="margin: 4px 0 0; color: #6c757d;",
             )
 
@@ -291,7 +309,6 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         *clip_info_children,
         style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;",
     )
-
 
     form_inputs = Div(
         Input(type="hidden", name="clip_id", value=str(clip.id)),
@@ -357,7 +374,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 name="transcription",
                 id="transcription-input",
                 rows="6",
-                placeholder="Escribí acá lo que se escucha, sin adornos ni faltas.",
+                placeholder="Escribe acá exactamente lo que se escucha, sin adornos ni cosas inventadas.",
                 style="width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; resize: vertical;",
             ),
             style="margin-bottom: 16px;"
@@ -368,7 +385,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 value=clip.username if hasattr(clip, 'username') and clip.username and clip.username != 'unknown' else "",
                 name="contributor_name",
                 id="contributor-name-input",
-                placeholder="Poné cómo querés aparecer en el ranking...",
+                placeholder="Escribe cómo quieres aparecer en el ranking...",
                 style="width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px;",
             ),
             Div(
@@ -433,6 +450,29 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;"
     )
 
+    waveform_controls = Div(
+        Div(
+            Button("▶ Reproducir", id="play-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            Button("⏸ Pausa", id="pause-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            Button("⏹ Volver", id="stop-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
+            style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;"
+        ),
+        Div(
+            Label("Velocidad:", style="font-weight: 600;"),
+            Select(
+                Option("0.75x", value="0.75"),
+                Option("1x", value="1", selected=True),
+                Option("1.25x", value="1.25"),
+                Option("1.5x", value="1.5"),
+                Option("2x", value="2"),
+                id="speed-select",
+                style="padding: 8px; border-radius: 6px; border: 1px solid #ced4da; min-width: 90px;"
+            ),
+            style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;"
+        ),
+        style="display: flex; flex-direction: column; align-items: stretch;"
+    )
+
     waveform = Div(
         Div(
             Div(
@@ -455,22 +495,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         ),
         Div(id="waveform", style="width: 100%; height: 140px; background: #f1f3f5; border-radius: 8px; margin-bottom: 12px;"),
         Div(id="timeline", style="width: 100%; margin-bottom: 16px;"),
-        Div(
-            Button("▶ Reproducir", id="play-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Button("⏸ Pausa", id="pause-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Button("⏹ Volver", id="stop-btn", cls="control-btn", style="padding: 10px 18px; font-size: 15px;"),
-            Label("Velocidad:", style="margin-left: 12px; font-weight: 600;"),
-            Select(
-                Option("0.75x", value="0.75"),
-                Option("1x", value="1", selected=True),
-                Option("1.25x", value="1.25"),
-                Option("1.5x", value="1.5"),
-                Option("2x", value="2"),
-                id="speed-select",
-                style="padding: 8px; border-radius: 6px; border: 1px solid #ced4da;"
-            ),
-            style="display: flex; align-items: center; gap: 10px; justify-content: center;"
-        ),
+        waveform_controls,
         style="margin-bottom: 24px;"
     )
 
@@ -518,6 +543,53 @@ def render_main_content(clip: Optional[ClipRecord]) -> Div:
     return render_empty_state()
 
 
+def render_about_panel() -> Div:
+    """Contenido de la pestaña About/Sobre el proyecto."""
+    return Div(
+        H2("Sobre este proyecto", style="margin-bottom: 12px; color: #0d6efd;"),
+        P(
+            "Esta herramienta existe para fines científicos: queremos construir un conjunto de datos de "
+            "transcripciones de audio en español chileno, para entrenar modelos de ",
+            A(
+                "reconocimiento automático de voz (ASR)",
+                href="https://huggingface.co/tasks/automatic-speech-recognition",
+                target="_blank",
+                rel="noopener",
+                style="color: #0d6efd; font-weight: 600;"
+            ),
+            " de código abierto.",
+            style="color: #495057; margin-bottom: 12px;"
+        ),
+        P(
+            "Todas las ",
+            Strong("transcripciones"),
+            " que se generen aquí y los ",
+            Strong("modelos"),
+            " que entrenemos con estos datos serán liberados como ",
+            Strong("recursos de código abierto"),
+            ", para que cualquiera los pueda usar, revisar y mejorar.",
+            style="color: #495057; margin-bottom: 12px;"
+        ),
+        P(
+            "Cada vez que corriges un texto o ajustas un clip, estás ayudando a que en el futuro existan "
+            "modelos de voz que entiendan mejor cómo hablamos en Chile.",
+            style="color: #495057; margin-bottom: 16px;"
+        ),
+        H3("¿Quieres saber más o colaborar?", style="margin-bottom: 8px;"),
+        P(
+            "Si quieres conocer más de este proyecto o colaborar, escribe a ",
+            A(
+                "alonsoastroza@udd.cl",
+                href="mailto:alonsoastroza@udd.cl",
+                style="color: #0d6efd; font-weight: 600;"
+            ),
+            ".",
+            style="color: #495057; margin-bottom: 0;"
+        ),
+        style="margin-bottom: 20px; padding: 20px; border-radius: 12px; background: #f8f9fa;"
+    )
+
+
 def render_tab_shell(
     active_tab: str,
     clip: Optional[ClipRecord],
@@ -554,6 +626,17 @@ def render_tab_shell(
         style=tab_button_style(active_tab == "ranking"),
     )
 
+    about_button = Button(
+        "About",
+        type="button",
+        cls=f"tab-button{' active' if active_tab == 'about' else ''}",
+        hx_get=f"/tab/about?clip_id={clip_id_value}",
+        hx_target="#tab-shell",
+        hx_swap="outerHTML",
+        hx_indicator="#tab-loading",
+        style=tab_button_style(active_tab == "about"),
+    )
+
     indicator = Div(
         "🔄 Cambiando de pestaña...",
         id="tab-loading",
@@ -576,12 +659,14 @@ def render_tab_shell(
         tab_content = Div(
             H2("Ranking de quienes están dando una mano", style="margin-bottom: 12px; color: #0d6efd;"),
             P(
-                "Los nombres aparecen si dejás el tuyo al enviar una anotación.",
+                "Los nombres aparecen si dejas el tuyo al enviar una anotación.",
                 style="color: #6c757d; margin-bottom: 16px;",
             ),
             render_contributor_stats(),
             style="margin-bottom: 20px;",
         )
+    elif active_tab == "about":
+        tab_content = render_about_panel()
     else:
         tab_content = render_main_content(clip)
 
@@ -591,9 +676,10 @@ def render_tab_shell(
         Div(
             annotate_button,
             ranking_button,
+            about_button,
             indicator,
             cls="tab-nav",
-            style="display: flex; gap: 8px; margin-bottom: 20px; align-items: center; justify-content: flex-end;",
+            style="display: flex; gap: 8px; margin-bottom: 20px; align-items: center; justify-content: flex-end; flex-wrap: wrap;",
         ),
         *body_children,
         id="tab-shell",
@@ -609,7 +695,7 @@ def render_contributor_stats() -> Div:
             return Div(
                 H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
                 P(
-                    "Todavía no hay nombres en la lista. Dejá el tuyo cuando mandes una anotación y aparecerás acá.",
+                    "Todavía no hay nombres en la lista. Deja el tuyo cuando mandes una anotación y aparecerás acá.",
                     style="color: #6c757d; font-style: italic;"
                 ),
                 cls="contributor-stats-panel",
@@ -962,40 +1048,27 @@ APP_SCRIPT = Script("""
     });
 """)
 
+
 def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = None) -> Titled:
     """Render the full application shell for the given clip."""
 
     tab_shell = render_tab_shell("anotar", clip, status_message)
 
-    description_section = Div(
-        P(
-            "Ayúdanos a construir la base de datos de audio en español chileno que nos permita entrenar nuevos modelos de código abierto.",
-            style="margin-bottom: 24px; color: #495057; font-size: 1.05rem;"
-        ),
-        style="margin-bottom: 12px;"
-    )
-
-    about_section = Div(
-        H3("About", style="margin-bottom: 6px;"),
-        P(
-            "Si quiere conocer más de este proyecto o colaborar, escribe a ",
-            A("alonsoastroza@udd.cl", href="mailto:alonsoastroza@udd.cl", style="color: #0d6efd; font-weight: 600;"),
-            ".",
-            style="color: #495057; margin-bottom: 0;"
-        ),
-        style="margin-top: 32px; padding: 20px; border-radius: 12px; background: #f8f9fa;"
-    )
-
     footer = Div(
         "Una iniciativa del ",
-        A("Instituto de Data Science UDD", href="https://github.com/idsudd", target="_blank", rel="noopener", style="color: #0d6efd; font-weight: 600;"),
+        A(
+            "Instituto de Data Science UDD",
+            href="https://github.com/idsudd",
+            target="_blank",
+            rel="noopener",
+            style="color: #0d6efd; font-weight: 600;"
+        ),
+        ".",
         style="margin-top: 32px; text-align: center; color: #6c757d;"
     )
 
     body_children = [
-        description_section,
         tab_shell,
-        about_section,
         footer,
     ]
 
@@ -1007,7 +1080,6 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
         ),
         APP_SCRIPT,
     )
-
 
 
 # Routes
@@ -1034,7 +1106,7 @@ def switch_tab(tab_name: str, clip_id: str = "", status_message: str = ""):
     """Render the requested tab via htmx."""
 
     normalized_tab = tab_name.lower()
-    if normalized_tab not in {"anotar", "ranking"}:
+    if normalized_tab not in {"anotar", "ranking", "about"}:
         normalized_tab = "anotar"
 
     clip = get_clip(clip_id) if clip_id else None
@@ -1190,7 +1262,6 @@ if not AUDIO_FOLDER_IS_REMOTE:
                 headers={"Cache-Control": "public, max-age=3600"}
             )
         return Response("Audio not found", status_code=404)
-
 
 
 # Print startup info
