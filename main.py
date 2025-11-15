@@ -258,7 +258,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     duration = clip.end_timestamp - clip.start_timestamp
 
     intro = Div(
-        H2("Vamos a anotar este clip", style="margin-bottom: 8px; color: #0d6efd;"),
+        H2("Vamos a transcribir este audio en español chileno", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
             "Ayúdanos a construir una base de datos de transcripciones de audio en español chileno "
             "para poder entrenar un modelo de código abierto que sí entienda cómo hablamos los chilenos.",
@@ -292,6 +292,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 Strong(str(event)),
                 " de ",
                 Strong(str(year)),
+                ".",
                 style="margin: 4px 0 0; color: #6c757d;",
             )
 
@@ -368,7 +369,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;"
         ),
         Div(
-            Label("Texto", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px;"),
+            Label("Texto (Escribe acá exactamente lo que se escucha)", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px;"),
             Textarea(
                 clip.text or "",
                 name="transcription",
@@ -382,7 +383,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         Div(
             Label("Tu nombre (opcional)", style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 16px; color: #495057;"),
             Input(
-                value=clip.username if hasattr(clip, 'username') and clip.username and clip.username != 'unknown' else "",
+                value=clip.username if hasattr(clip, 'username') and clip.username and clip.username != 'Alonso' else "",
                 name="contributor_name",
                 id="contributor-name-input",
                 placeholder="Escribe cómo quieres aparecer en el ranking...",
@@ -627,7 +628,7 @@ def render_tab_shell(
     )
 
     about_button = Button(
-        "About",
+        "Acerca de",
         type="button",
         cls=f"tab-button{' active' if active_tab == 'about' else ''}",
         hx_get=f"/tab/about?clip_id={clip_id_value}",
