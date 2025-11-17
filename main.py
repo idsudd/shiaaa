@@ -272,10 +272,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     duration = clip.end_timestamp - clip.start_timestamp
 
     intro = Div(
-        H2("Vamos a transcribir este audio en español chileno", style="margin-bottom: 8px; color: #0d6efd;"),
+        H2("Ayúdanos a transcribir este audio en español chileno", style="margin-bottom: 8px; color: #0d6efd;"),
         P(
-            "Ayúdanos a construir una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de código abierto que si pueda entender cómo hablamos los chilenos.",
+            "Estamos construyendo una base de datos de transcripciones de audio en español chileno "
+            "para poder entrenar un modelo de IA que si pueda entender cómo hablamos los chilenos.",
             style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
         ),
         P(
@@ -286,8 +286,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             Strong("corrige el texto"),
             " si tiene errores y ",
             Strong("ajusta los tiempos de inicio y fin del clip"),
-            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan "
-            "y mantén la forma natural de hablar de las personas del audio.",
+            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan.",
             style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
         style="margin-bottom: 18px; background: #f1f5ff; padding: 16px; border-radius: 10px;",
