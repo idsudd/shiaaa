@@ -1157,13 +1157,13 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
         Img(
             src="/shiaaa.png",
             alt="¡shiaaa! logo",
-            style="max-width: 280px; width: 100%; height: auto;",
+            style="width: clamp(120px, 18vw, 180px); height: auto;",
             loading="lazy",
         ),
         cls="brand-hero",
         style=(
-            "text-align: center; display: flex; flex-direction: column; align-items: center; "
-            "margin-bottom: 28px; padding: 20px; background: white;"
+            "display: flex; justify-content: flex-start; align-items: center; gap: 12px;"
+            "text-align: left; margin-bottom: 24px; padding: 8px 0;"
         ),
     )
 
@@ -1176,8 +1176,12 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
     return Titled(
         "",
         Div(
-            *body_children,
-            cls="container"
+            Div(
+                *body_children,
+                cls="container",
+                hx_boost="true",
+            ),
+            cls="page-shell",
         ),
         APP_SCRIPT,
     )
