@@ -17,7 +17,7 @@ body {
     padding: clamp(20px, 3vw, 32px);
     border-radius: 20px;
     box-shadow: 0 18px 55px rgba(247,147,30,0.15);
-    border: 1px solid #ffd9b3;
+    border: none !important;
 }
 
 /* Waveform styling */
