@@ -34,10 +34,10 @@ SOCIAL_DESCRIPTION = (
     "Ayuda a mejorar los modelos de voz en español chileno corrigiendo audios reales."
 )
 SOCIAL_HEADERS = Socials(
-    title=f"{APP_BRAND} · Corre audios reales de humor chileno",
+    title=f"{APP_BRAND} · Corrige audios reales de humor chileno",
     site_name=SITE_DOMAIN,
     description=SOCIAL_DESCRIPTION,
-    image="/shiaaa.png",
+    image="/shiaaa2.png",
     url=SITE_URL,
     card="summary_large_image",
 )
