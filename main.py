@@ -1163,8 +1163,7 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
         cls="brand-hero",
         style=(
             "text-align: center; display: flex; flex-direction: column; align-items: center; "
-            "margin-bottom: 28px; padding: 16px; background: "
-            f"{BRAND_ORANGE_LIGHT}; border-radius: 16px;"
+            "margin-bottom: 28px; padding: 20px; background: white;"
         ),
     )
 
@@ -1175,7 +1174,7 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
     ]
 
     return Titled(
-        APP_BRAND,
+        "",
         Div(
             *body_children,
             cls="container"
