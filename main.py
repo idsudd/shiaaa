@@ -37,7 +37,7 @@ SOCIAL_HEADERS = Socials(
     title=f"{APP_BRAND} · Corrige audios reales de humor chileno",
     site_name=SITE_DOMAIN,
     description=SOCIAL_DESCRIPTION,
-    image="/shiaaa2.png",
+    image="/shiaaa3.png",
     url=SITE_URL,
     card="summary_large_image",
 )
