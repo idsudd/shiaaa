@@ -660,6 +660,18 @@ def render_about_panel() -> Div:
                 style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
             ),
             ".",
+            style="color: #495057; margin-bottom: 12px;"
+        ),
+        P(
+            "Agradecimientos especiales a ",
+            A(
+                "Fabián Choppelo",
+                href="https://www.linkedin.com/in/fchoppelo/",
+                target="_blank",
+                rel="noopener",
+                style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
+            ),
+            " por el logo y la identidad visual.",
             style="color: #495057; margin-bottom: 0;"
         ),
         style="margin-bottom: 20px; padding: 20px; border-radius: 12px; background: #f8f9fa;"
