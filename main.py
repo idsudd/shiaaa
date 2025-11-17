@@ -25,6 +25,23 @@ from db_backend import ClipRecord, DatabaseBackend
 config: AppConfig = parse_app_config()
 APP_BRAND = "¡shiaaa!"
 
+BRAND_ORANGE = "#f7931e"
+BRAND_ORANGE_DARK = "#c86400"
+BRAND_ORANGE_LIGHT = "#fff4e8"
+SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "shiaaa.cl")
+SITE_URL = os.environ.get("SITE_URL") or f"https://{SITE_DOMAIN}"
+SOCIAL_DESCRIPTION = (
+    "Ayuda a mejorar los modelos de voz en español chileno corrigiendo audios reales."
+)
+SOCIAL_HEADERS = Socials(
+    title=f"{APP_BRAND} · Corre audios reales de humor chileno",
+    site_name=SITE_DOMAIN,
+    description=SOCIAL_DESCRIPTION,
+    image="/shiaaa.png",
+    url=SITE_URL,
+    card="summary_large_image",
+)
+
 # Database setup
 database_url = (
     config.database_url
@@ -49,6 +66,7 @@ app, rt = fast_app(
         Script(src='https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.min.js'),
         Script(src='https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/plugins/regions.min.js'),
         Script(src='https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/plugins/timeline.min.js'),
+        *SOCIAL_HEADERS,
     ),
     pico=False,
     debug=True
@@ -272,10 +290,13 @@ def render_clip_editor(clip: ClipRecord) -> Div:
     duration = clip.end_timestamp - clip.start_timestamp
 
     intro = Div(
-        H2("Ayúdanos a transcribir este audio en español chileno", style="margin-bottom: 8px; color: #0d6efd;"),
+        H2(
+            "Ayúdanos a transcribir este audio en español chileno",
+            style=f"margin-bottom: 8px; color: {BRAND_ORANGE};",
+        ),
         P(
             "Estamos construyendo una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de IA que si pueda entender cómo hablamos los chilenos.",
+            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos.",
             style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
         ),
         P(
@@ -286,10 +307,14 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             Strong("corrige el texto"),
             " si tiene errores y ",
             Strong("ajusta los tiempos de inicio y fin del clip"),
-            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan.",
+            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan. ",
+            Strong("Si el audio no se escucha bien o no tiene texto a transcribir, usa el botón \"Reportar audio\" para avisarnos."),
             style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
-        style="margin-bottom: 18px; background: #f1f5ff; padding: 16px; border-radius: 10px;",
+        style=(
+            f"margin-bottom: 18px; background: {BRAND_ORANGE_LIGHT}; padding: 16px; "
+            "border-radius: 10px;"
+        ),
     )
 
     metadata_line = None
@@ -311,7 +336,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip_info_children = [
         Div(
-            Span(f"Clip #{clip.id}", style="font-weight: 600; color: #0d6efd;"),
+            Span(
+                f"Clip #{clip.id}",
+                style=f"font-weight: 600; color: {BRAND_ORANGE};",
+            ),
             Span(f"· {duration:.1f}s"),
             style="display: flex; gap: 8px; align-items: center; color: #495057;",
         )
@@ -420,7 +448,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             hx_target="#main-content",
             hx_swap="outerHTML",
             hx_indicator="#loading-complete",
-            style="padding: 12px 18px; border-radius: 6px; background: #0d6efd; color: white; border: none; font-size: 15px; cursor: pointer;"
+            style=(
+                f"padding: 12px 18px; border-radius: 6px; background: {BRAND_ORANGE}; "
+                "color: white; border: none; font-size: 15px; cursor: pointer;"
+            ),
         ),
         Button(
             "➡️ Siguiente clip",
@@ -430,10 +461,13 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             hx_target="#main-content",
             hx_swap="outerHTML",
             hx_indicator="#loading-next",
-            style="padding: 12px 18px; border-radius: 6px; background: #ffc107; color: #000; border: none; font-size: 15px; cursor: pointer;"
+            style=(
+                "padding: 12px 18px; border-radius: 6px; background: #ffe1be; color: #6a3b00; "
+                "border: 1px solid #f7a74d; font-size: 15px; cursor: pointer;"
+            ),
         ),
         Button(
-            "🚩 Clip raro",
+            "🚩 Reportar audio",
             cls="flag-btn",
             hx_post="/flag_clip",
             hx_include="#clip-form input, #clip-form textarea",
@@ -491,7 +525,11 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         Div(
             Div(
                 "Tiempo actual: ",
-                Span("0.00", id="current-time", style="font-weight: bold; color: #0d6efd;"),
+                Span(
+                    "0.00",
+                    id="current-time",
+                    style=f"font-weight: bold; color: {BRAND_ORANGE};",
+                ),
                 " s",
                 style="font-size: 16px; margin-bottom: 12px;"
             ),
@@ -501,13 +539,22 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 "] inicio • [",
                 Span("W", style="font-weight: 600; color: #dc3545;"),
                 "] fin • [",
-                Span("Espacio", style="font-weight: 600; color: #0d6efd;"),
+                Span(
+                    "Espacio",
+                    style=f"font-weight: 600; color: {BRAND_ORANGE};",
+                ),
                 "] reproducir/pausa",
                 style="color: #6c757d; font-size: 14px;"
             ),
             style="margin-bottom: 16px;"
         ),
-        Div(id="waveform", style="width: 100%; height: 140px; background: #f1f3f5; border-radius: 8px; margin-bottom: 12px;"),
+        Div(
+            id="waveform",
+            style=(
+                "width: 100%; height: 140px; background: #fff3e6; border-radius: 8px; "
+                "margin-bottom: 12px;"
+            ),
+        ),
         Div(id="timeline", style="width: 100%; margin-bottom: 16px;"),
         waveform_controls,
         style="margin-bottom: 24px;"
@@ -560,7 +607,10 @@ def render_main_content(clip: Optional[ClipRecord]) -> Div:
 def render_about_panel() -> Div:
     """Contenido de la pestaña About/Sobre el proyecto."""
     return Div(
-        H2("Sobre este proyecto", style="margin-bottom: 12px; color: #0d6efd;"),
+        H2(
+            "Sobre este proyecto",
+            style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
+        ),
         P(
             "Esta herramienta existe para fines científicos: queremos construir un conjunto de datos de "
             "transcripciones de audio en español chileno, para entrenar modelos de ",
@@ -569,7 +619,7 @@ def render_about_panel() -> Div:
                 href="https://huggingface.co/tasks/automatic-speech-recognition",
                 target="_blank",
                 rel="noopener",
-                style="color: #0d6efd; font-weight: 600;"
+                style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
             ),
             " de código abierto.",
             style="color: #495057; margin-bottom: 12px;"
@@ -595,7 +645,7 @@ def render_about_panel() -> Div:
             A(
                 "alonsoastroza@udd.cl",
                 href="mailto:alonsoastroza@udd.cl",
-                style="color: #0d6efd; font-weight: 600;"
+                style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
             ),
             ".",
             style="color: #495057; margin-bottom: 12px;"
@@ -607,7 +657,7 @@ def render_about_panel() -> Div:
                 href="https://github.com/idsudd/shiaaa",
                 target="_blank",
                 rel="noopener",
-                style="color: #0d6efd; font-weight: 600;"
+                style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
             ),
             ".",
             style="color: #495057; margin-bottom: 0;"
@@ -626,8 +676,15 @@ def render_tab_shell(
     clip_id_value = str(clip.id) if clip else ""
 
     def tab_button_style(is_active: bool) -> str:
-        base = "padding: 10px 18px; border-radius: 999px; border: none; font-weight: 600; cursor: pointer;"
-        colors = " background: #0d6efd; color: #ffffff;" if is_active else " background: #e9ecef; color: #495057;"
+        base = (
+            "padding: 10px 18px; border-radius: 999px; border: none; font-weight: 600; "
+            "cursor: pointer; transition: background 0.2s ease, color 0.2s ease;"
+        )
+        colors = (
+            f" background: {BRAND_ORANGE}; color: #ffffff; box-shadow: 0 8px 16px rgba(247, 147, 30, 0.25);"
+            if is_active
+            else " background: #fff1e1; color: #8b4d13; border: 1px solid #ffd2a4;"
+        )
         return base + colors
 
     annotate_button = Button(
@@ -683,7 +740,10 @@ def render_tab_shell(
 
     if active_tab == "ranking":
         tab_content = Div(
-            H2("Ranking de quienes están dando una mano", style="margin-bottom: 12px; color: #0d6efd;"),
+            H2(
+                "Ranking de quienes están dando una mano",
+                style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
+            ),
             P(
                 "Los nombres aparecen si dejas el tuyo al enviar una anotación.",
                 style="color: #6c757d; margin-bottom: 16px;",
@@ -1087,19 +1147,34 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
             href="https://github.com/idsudd",
             target="_blank",
             rel="noopener",
-            style="color: #0d6efd; font-weight: 600;"
+            style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;"
         ),
         ".",
         style="margin-top: 32px; text-align: center; color: #6c757d;"
     )
 
+    hero_header = Div(
+        Img(
+            src="/shiaaa.png",
+            alt="¡shiaaa! logo",
+            style="max-width: 280px; width: 100%; height: auto;",
+            loading="lazy",
+        ),
+        cls="brand-hero",
+        style=(
+            "text-align: center; display: flex; flex-direction: column; align-items: center; "
+            "margin-bottom: 28px; padding: 20px; background: white;"
+        ),
+    )
+
     body_children = [
+        hero_header,
         tab_shell,
         footer,
     ]
 
     return Titled(
-        APP_BRAND,
+        "",
         Div(
             *body_children,
             cls="container"
@@ -1258,6 +1333,15 @@ def get_styles():
     if css_path.exists():
         return FileResponse(str(css_path), media_type="text/css")
     return Response("/* Styles not found */", media_type="text/css")
+
+
+@rt("/shiaaa.png")
+def get_logo():
+    """Serve the site logo for the UI and social previews."""
+    logo_path = ROOT_DIR / "shiaaa.png"
+    if logo_path.exists():
+        return FileResponse(str(logo_path), media_type="image/png")
+    return Response("", status_code=404)
 
 
 # Only create local audio route if audio_folder is a local path (not a URL)
