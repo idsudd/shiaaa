@@ -31,10 +31,10 @@ BRAND_ORANGE_LIGHT = "#fff4e8"
 SITE_DOMAIN = os.environ.get("SITE_DOMAIN", "shiaaa.cl")
 SITE_URL = os.environ.get("SITE_URL") or f"https://{SITE_DOMAIN}"
 SOCIAL_DESCRIPTION = (
-    "Ayuda a mejorar los modelos de voz en español chileno corrigiendo clips reales."
+    "Ayuda a mejorar los modelos de voz en español chileno corrigiendo audios reales."
 )
 SOCIAL_HEADERS = Socials(
-    title=f"{APP_BRAND} · Corre clips reales de comedia chilena",
+    title=f"{APP_BRAND} · Corre audios reales de humor chileno",
     site_name=SITE_DOMAIN,
     description=SOCIAL_DESCRIPTION,
     image="/shiaaa.png",
@@ -296,7 +296,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         ),
         P(
             "Estamos construyendo una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de IA que si pueda entender cómo hablamos los chilenos.",
+            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos.",
             style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
         ),
         P(
@@ -307,7 +307,8 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             Strong("corrige el texto"),
             " si tiene errores y ",
             Strong("ajusta los tiempos de inicio y fin del clip"),
-            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan.",
+            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan. ",
+            Strong("Si el audio no se escucha bien o no tiene texto a transcribir, usa el botón \"Reportar audio\" para avisarnos."),
             style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
         style=(
@@ -466,7 +467,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             ),
         ),
         Button(
-            "🚩 Clip raro",
+            "🚩 Reportar audio",
             cls="flag-btn",
             hx_post="/flag_clip",
             hx_include="#clip-form input, #clip-form textarea",
@@ -1159,14 +1160,10 @@ def render_app_page(clip: Optional[ClipRecord], status_message: Optional[str] = 
             style="max-width: 280px; width: 100%; height: auto;",
             loading="lazy",
         ),
-        P(
-            "Corre clips reales de comedia chilena y ayúdanos a construir mejores modelos de voz.",
-            style="margin: 8px 0 0; color: #4a3724; font-weight: 600; font-size: 1.05rem;",
-        ),
         cls="brand-hero",
         style=(
             "text-align: center; display: flex; flex-direction: column; align-items: center; "
-            "gap: 4px; margin-bottom: 28px; padding: 16px; background: "
+            "margin-bottom: 28px; padding: 16px; background: "
             f"{BRAND_ORANGE_LIGHT}; border-radius: 16px;"
         ),
     )
