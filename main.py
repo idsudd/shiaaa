@@ -765,7 +765,7 @@ def render_tab_shell(
                 style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
             ),
             P(
-                "Los nombres aparecen si dejas el tuyo al enviar una anotación.",
+                "Los nombres aparecen si dejas el tuyo al corregir una transcripción.",
                 style="color: #6c757d; margin-bottom: 16px;",
             ),
             render_contributor_stats(),
@@ -831,14 +831,14 @@ def render_contributor_stats() -> Div:
             H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
             Div(
                 P(
-                    f"Personas que ayudaron: {stats['total_contributors']} · Anotaciones enviadas: {stats['total_contributions']}",
+                    f"Personas que ayudaron: {stats['total_contributors']} · Transcripciones enviadas: {stats['total_contributions']}",
                     style="margin-bottom: 12px; font-weight: 500; color: #495057;"
                 ),
                 *contributor_list,
                 style="margin-bottom: 8px;"
             ),
             P(
-                "Gracias por la ayuda inmensa 💚. ",
+                "Gracias por la ayuda 💚. ",
                 style="color: #198754; font-style: italic; margin-bottom: 0; font-size: 14px;"
             ),
             cls="contributor-stats-panel",
