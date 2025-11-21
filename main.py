@@ -297,7 +297,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         ),
         P(
             "Estamos construyendo una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos. ",
+            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos.",
+            style="color: #495057; margin-bottom: 8px; font-size: 0.95rem;",
+        ),
+        P(
             Strong("¿Qué tienes que hacer? "),
             "Primero, ",
             Strong("escucha el audio completo"),
@@ -305,7 +308,10 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             Strong("corrige el texto"),
             " si tiene errores y ",
             Strong("ajusta los tiempos de inicio y fin del clip"),
-            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan. ",
+            " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan.",
+            style="color: #495057; margin-bottom: 8px; font-size: 0.95rem;",
+        ),
+        P(
             Strong("Si el audio no se escucha bien o no tiene texto a transcribir, usa el botón \"Reportar audio\" para avisarnos."),
             " ¿Tienes dudas? ",
             A(
@@ -811,7 +817,7 @@ def render_contributor_stats() -> Div:
 
         if stats["total_contributors"] == 0:
             return Div(
-                H4("Ranking de quienes están dando una mano", style=f"margin-bottom: 10px; color: {BRAND_ORANGE};"),
+                H2("Quiénes nos están dando una mano", style=f"margin-bottom: 12px; color: {BRAND_ORANGE};"),
                 P(
                     "Todavía no hay nombres en la lista. Deja el tuyo cuando mandes una anotación y aparecerás acá.",
                     style="color: #6c757d; font-style: italic;"
@@ -845,7 +851,7 @@ def render_contributor_stats() -> Div:
             )
 
         return Div(
-            H4("Ranking de quienes están dando una mano", style=f"margin-bottom: 10px; color: {BRAND_ORANGE};"),
+            H2("Quiénes nos están dando una mano", style=f"margin-bottom: 12px; color: {BRAND_ORANGE};"),
             Div(
                 P(
                     f"Personas que ayudaron: {stats['total_contributors']} · Transcripciones enviadas: {stats['total_contributions']}",
@@ -872,6 +878,11 @@ def render_contributor_stats() -> Div:
 def render_faq_panel() -> Div:
     """Render the frequently asked questions section."""
     return Div(
+        H2(
+            "Preguntas frecuentes",
+            style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
+        ),
+        Div(
             Div(
                 P(
                     Strong("¿Cómo debo transcribir palabras como \"weno\"?"),
@@ -933,7 +944,9 @@ def render_faq_panel() -> Div:
                 ),
             ),
             style="background: #f8f9fa; padding: 16px; border-radius: 10px; border: 1px solid #e9ecef; display: flex; flex-direction: column; gap: 8px;",
-        )
+        ),
+        style="margin-bottom: 20px;"
+    )
 
 
 APP_SCRIPT = Script("""
