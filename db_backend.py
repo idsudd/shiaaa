@@ -785,10 +785,19 @@ class DatabaseBackend:
             if self.backend == "sqlite":
                 with self._sqlite_conn() as conn:
                     cursor = conn.cursor()
-                    
+
+                    cursor.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM clips
+                        WHERE human_reviewed = 1
+                        """
+                    )
+                    total_contributions = cursor.fetchone()[0] or 0
+
                     # Get only human_reviewed clips with non-anonymous contributors
                     cursor.execute("""
-                        SELECT 
+                        SELECT
                             username,
                             COUNT(*) as contributions
                         FROM clips 
@@ -797,10 +806,9 @@ class DatabaseBackend:
                         GROUP BY username 
                         ORDER BY contributions DESC
                     """)
-                    
+
                     contributors = []
-                    total_contributions = 0
-                    
+
                     for row in cursor.fetchall():
                         username, contributions = row
                         contributors.append({
@@ -808,8 +816,7 @@ class DatabaseBackend:
                             "contributions": contributions,
                             "reviewed_clips": contributions  # Same as contributions since we only count reviewed clips
                         })
-                        total_contributions += contributions
-                    
+
                     return {
                         "total_contributors": len(contributors),
                         "total_contributions": total_contributions,
@@ -818,8 +825,17 @@ class DatabaseBackend:
                     
             else:  # postgres
                 with self._postgres_cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM clips
+                        WHERE human_reviewed = true
+                        """
+                    )
+                    total_contributions = cur.fetchone()[0] or 0
+
                     cur.execute("""
-                        SELECT 
+                        SELECT
                             username,
                             COUNT(*) as contributions
                         FROM clips 
@@ -828,10 +844,9 @@ class DatabaseBackend:
                         GROUP BY username 
                         ORDER BY contributions DESC
                     """)
-                    
+
                     contributors = []
-                    total_contributions = 0
-                    
+
                     for row in cur.fetchall():
                         username, contributions = row
                         contributors.append({
@@ -839,8 +854,7 @@ class DatabaseBackend:
                             "contributions": contributions,
                             "reviewed_clips": contributions  # Same as contributions since we only count reviewed clips
                         })
-                        total_contributions += contributions
-                    
+
                     return {
                         "total_contributors": len(contributors),
                         "total_contributions": total_contributions,

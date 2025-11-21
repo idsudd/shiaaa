@@ -238,6 +238,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
 
     clip = ensure_clip_segment(clip)
     metadata = get_audio_metadata(clip.audio_path)
+    clip_id_value = str(clip.id)
     # If there is no segment file, we cannot show the waveform for this clip.
     if not clip.segment_path:
         return Div(
@@ -310,6 +311,20 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan. ",
             Strong("Si el audio no se escucha bien o no tiene texto a transcribir, usa el botón \"Reportar audio\" para avisarnos."),
             style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
+        ),
+        P(
+            "¿Tienes dudas? ",
+            A(
+                "Lee la FAQ",
+                href="#",
+                hx_get=f"/tab/faq?clip_id={clip_id_value}",
+                hx_target="#tab-shell",
+                hx_swap="outerHTML",
+                hx_indicator="#tab-loading",
+                style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;",
+            ),
+            " para ver ejemplos y cómo se usan tus aportes.",
+            style="color: #6c757d; margin: 10px 0 0; font-size: 0.93rem;",
         ),
         style=(
             f"margin-bottom: 18px; background: {BRAND_ORANGE_LIGHT}; padding: 16px; "
@@ -729,6 +744,17 @@ def render_tab_shell(
         style=tab_button_style(active_tab == "ranking"),
     )
 
+    faq_button = Button(
+        "FAQ",
+        type="button",
+        cls=f"tab-button{' active' if active_tab == 'faq' else ''}",
+        hx_get=f"/tab/faq?clip_id={clip_id_value}",
+        hx_target="#tab-shell",
+        hx_swap="outerHTML",
+        hx_indicator="#tab-loading",
+        style=tab_button_style(active_tab == "faq"),
+    )
+
     about_button = Button(
         "Acerca de",
         type="button",
@@ -771,6 +797,8 @@ def render_tab_shell(
             render_contributor_stats(),
             style="margin-bottom: 20px;",
         )
+    elif active_tab == "faq":
+        tab_content = render_faq_panel()
     elif active_tab == "about":
         tab_content = render_about_panel()
     else:
@@ -782,6 +810,7 @@ def render_tab_shell(
         Div(
             annotate_button,
             ranking_button,
+            faq_button,
             about_button,
             indicator,
             cls="tab-nav",
@@ -811,11 +840,16 @@ def render_contributor_stats() -> Div:
                 ),
             )
 
-        top_contributors = stats["contributors"][:5]
-
         contributor_list = []
-        for i, contributor in enumerate(top_contributors):
-            rank_emoji = ["🥇", "🥈", "🥉", "🏅", "⭐"][i] if i < 5 else "✨"
+        for i, contributor in enumerate(stats["contributors"]):
+            if i == 0:
+                rank_emoji = "🥇"
+            elif i == 1:
+                rank_emoji = "🥈"
+            elif i == 2:
+                rank_emoji = "🥉"
+            else:
+                rank_emoji = "⭐"
             contributor_list.append(
                 Div(
                     Span(f"{rank_emoji} {contributor['name']}", style="font-weight: 600;"),
@@ -850,6 +884,80 @@ def render_contributor_stats() -> Div:
     except Exception as e:
         print(f"Error rendering contributor stats: {e}")
         return Div()  # Return empty div on error
+
+
+def render_faq_panel() -> Div:
+    """Render the frequently asked questions section."""
+    return Div(
+        H2("Preguntas frecuentes", style=f"margin-bottom: 12px; color: {BRAND_ORANGE};"),
+        P(
+            "Preguntas y respuestas sobre cómo anotar, qué escribir y cómo usaremos lo que envías.",
+            style="color: #6c757d; margin-bottom: 16px;",
+        ),
+        Div(
+            Div(
+                P(
+                    Strong("¿Cómo debo transcribir palabras como \"weno\"?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "Escribe lo que escuchas. Ambas formas sirven, pero preferimos \"weno\" porque refleja cómo hablaríamos y cómo te gustaría verlo transcrito por tu app favorita.",
+                    style="color: #495057; margin-bottom: 14px;",
+                ),
+            ),
+            Div(
+                P(
+                    Strong("¿Escribo solo lo que se entiende o relleno lo que falta?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "No completes con suposiciones ni inventes texto. Corrige lo que sí se entiende y deja fuera lo que no se escucha o queda incompleto. En el caso que justo al audio corte la pronunciación de una palabra, puedes ajustar el tiempo de fin para que no quede a medias.",
+                    style="color: #495057; margin-bottom: 14px;",
+                ),
+            ),
+            Div(
+                P(
+                    Strong("¿Qué hago si el recorte del clip quedó corrido?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "Mueve los tiempos de inicio y fin para que el fragmento se alinee con lo que escuchas. Solo ajusta los extremos, no necesitas recortar todo el audio.",
+                    style="color: #495057; margin-bottom: 14px;",
+                ),
+            ),
+            Div(
+                P(
+                    Strong("El audio se escucha mal o no tiene texto, ¿qué hago?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "Avísanos con el botón \"Reportar audio\" cuando el clip no se entienda o no corresponda a una transcripción.",
+                    style="color: #495057; margin-bottom: 14px;",
+                ),
+            ),
+            Div(
+                P(
+                    Strong("¿Cómo se usarán los datos que envío?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "Todos los datos y los modelos entrenados con ellos serán de código abierto y estarán disponibles públicamente para cualquiera.",
+                    style="color: #495057; margin-bottom: 14px;",
+                ),
+            ),
+            Div(
+                P(
+                    Strong("¿Habrá una API para usar el modelo en mi aplicación?"),
+                    style="margin-bottom: 6px; color: #343a40;",
+                ),
+                P(
+                    "El modelo aún no está listo, pero lo liberaremos como un modelo open source para que puedas integrarlo como prefieras.",
+                    style="color: #495057; margin-bottom: 0;",
+                ),
+            ),
+            style="background: #f8f9fa; padding: 16px; border-radius: 10px; border: 1px solid #e9ecef; display: flex; flex-direction: column; gap: 8px;",
+        ),
+    )
 
 
 APP_SCRIPT = Script("""
@@ -1231,7 +1339,7 @@ def switch_tab(tab_name: str, clip_id: str = "", status_message: str = ""):
     """Render the requested tab via htmx."""
 
     normalized_tab = tab_name.lower()
-    if normalized_tab not in {"anotar", "ranking", "about"}:
+    if normalized_tab not in {"anotar", "ranking", "faq", "about"}:
         normalized_tab = "anotar"
 
     clip = get_clip(clip_id) if clip_id else None
