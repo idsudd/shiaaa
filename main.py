@@ -878,11 +878,11 @@ def render_contributor_stats() -> Div:
 def render_faq_panel() -> Div:
     """Render the frequently asked questions section."""
     return Div(
-        H2(
-            "Preguntas frecuentes",
-            style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
-        ),
         Div(
+            H2(
+                "Preguntas frecuentes",
+                style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
+            ),
             Div(
                 P(
                     Strong("¿Cómo debo transcribir palabras como \"weno\"?"),
