@@ -297,10 +297,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
         ),
         P(
             "Estamos construyendo una base de datos de transcripciones de audio en español chileno "
-            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos.",
-            style="color: #495057; margin-bottom: 8px; font-size: 0.98rem;",
-        ),
-        P(
+            "para poder entrenar un modelo de IA que pueda entender cómo hablamos los chilenos. ",
             Strong("¿Qué tienes que hacer? "),
             "Primero, ",
             Strong("escucha el audio completo"),
@@ -310,12 +307,9 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             Strong("ajusta los tiempos de inicio y fin del clip"),
             " si ves que el recorte quedó corrido. No agregues cosas que no se escuchan. ",
             Strong("Si el audio no se escucha bien o no tiene texto a transcribir, usa el botón \"Reportar audio\" para avisarnos."),
-            style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
-        ),
-        P(
-            "¿Tienes dudas? ",
+            " ¿Tienes dudas? ",
             A(
-                "Lee la FAQ",
+                "Lee las preguntas frecuentes",
                 href="#",
                 hx_get=f"/tab/faq?clip_id={clip_id_value}",
                 hx_target="#tab-shell",
@@ -323,8 +317,8 @@ def render_clip_editor(clip: ClipRecord) -> Div:
                 hx_indicator="#tab-loading",
                 style=f"color: {BRAND_ORANGE_DARK}; font-weight: 600;",
             ),
-            " para ver ejemplos y cómo se usan tus aportes.",
-            style="color: #6c757d; margin: 10px 0 0; font-size: 0.93rem;",
+            ".",
+            style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
         style=(
             f"margin-bottom: 18px; background: {BRAND_ORANGE_LIGHT}; padding: 16px; "
@@ -785,18 +779,7 @@ def render_tab_shell(
         )
 
     if active_tab == "ranking":
-        tab_content = Div(
-            H2(
-                "Ranking de quienes están dando una mano",
-                style=f"margin-bottom: 12px; color: {BRAND_ORANGE};",
-            ),
-            P(
-                "Los nombres aparecen si dejas el tuyo al corregir una transcripción.",
-                style="color: #6c757d; margin-bottom: 16px;",
-            ),
-            render_contributor_stats(),
-            style="margin-bottom: 20px;",
-        )
+        tab_content = render_contributor_stats()
     elif active_tab == "faq":
         tab_content = render_faq_panel()
     elif active_tab == "about":
@@ -828,7 +811,7 @@ def render_contributor_stats() -> Div:
 
         if stats["total_contributors"] == 0:
             return Div(
-                H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
+                H4("Ranking de quienes están dando una mano", style=f"margin-bottom: 10px; color: {BRAND_ORANGE};"),
                 P(
                     "Todavía no hay nombres en la lista. Deja el tuyo cuando mandes una anotación y aparecerás acá.",
                     style="color: #6c757d; font-style: italic;"
@@ -862,7 +845,7 @@ def render_contributor_stats() -> Div:
             )
 
         return Div(
-            H4("🙏 Ranking de aportes", style="margin-bottom: 10px; color: #343a40;"),
+            H4("Ranking de quienes están dando una mano", style=f"margin-bottom: 10px; color: {BRAND_ORANGE};"),
             Div(
                 P(
                     f"Personas que ayudaron: {stats['total_contributors']} · Transcripciones enviadas: {stats['total_contributions']}",
@@ -889,12 +872,6 @@ def render_contributor_stats() -> Div:
 def render_faq_panel() -> Div:
     """Render the frequently asked questions section."""
     return Div(
-        H2("Preguntas frecuentes", style=f"margin-bottom: 12px; color: {BRAND_ORANGE};"),
-        P(
-            "Preguntas y respuestas sobre cómo anotar, qué escribir y cómo usaremos lo que envías.",
-            style="color: #6c757d; margin-bottom: 16px;",
-        ),
-        Div(
             Div(
                 P(
                     Strong("¿Cómo debo transcribir palabras como \"weno\"?"),
