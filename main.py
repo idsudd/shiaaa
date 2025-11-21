@@ -313,7 +313,7 @@ def render_clip_editor(clip: ClipRecord) -> Div:
             style="color: #495057; margin-bottom: 0; font-size: 0.95rem;",
         ),
         P(
-            "¿Tienes dudas rápidas? ",
+            "¿Tienes dudas? ",
             A(
                 "Lee la FAQ",
                 href="#",
@@ -911,17 +911,7 @@ def render_faq_panel() -> Div:
                     style="margin-bottom: 6px; color: #343a40;",
                 ),
                 P(
-                    "No completes con suposiciones ni inventes texto. Corrige lo que sí se entiende y deja fuera lo que no se escucha o queda incompleto.",
-                    style="color: #495057; margin-bottom: 14px;",
-                ),
-            ),
-            Div(
-                P(
-                    Strong("¿Debo escuchar el clip completo antes de editar?"),
-                    style="margin-bottom: 6px; color: #343a40;",
-                ),
-                P(
-                    "Sí. Escuchar el fragmento entero te ayuda a entender el contexto y a corregir mejor el texto y los tiempos.",
+                    "No completes con suposiciones ni inventes texto. Corrige lo que sí se entiende y deja fuera lo que no se escucha o queda incompleto. En el caso que justo al audio corte la pronunciación de una palabra, puedes ajustar el tiempo de fin para que no quede a medias.",
                     style="color: #495057; margin-bottom: 14px;",
                 ),
             ),
